@@ -199,7 +199,7 @@ class BYM2Model:
             import pytensor.tensor as pt
         except ImportError as exc:
             raise ImportError(
-                "Fitting requires pymc. Install with: pip install pymc"
+                "Fitting requires pymc. Install with: uv pip install pymc"
             ) from exc
 
         claims = np.asarray(claims, dtype=np.int64)
@@ -296,7 +296,7 @@ def _resolve_sampler() -> tuple[str, dict]:
     except ImportError:
         warnings.warn(
             "nutpie is not installed. Using PyMC's default NUTS sampler. "
-            "Install nutpie for 2-5x faster sampling: pip install nutpie",
+            "Install nutpie for 2-5x faster sampling: uv pip install nutpie",
             UserWarning,
             stacklevel=3,
         )

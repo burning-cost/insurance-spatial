@@ -59,7 +59,7 @@ def extract_relativities(
     try:
         import arviz as az
     except ImportError as exc:
-        raise ImportError("extract_relativities requires arviz. pip install arviz") from exc
+        raise ImportError("extract_relativities requires arviz. uv pip install arviz") from exc
 
     trace = result.trace
 
