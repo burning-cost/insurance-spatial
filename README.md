@@ -27,17 +27,17 @@ This library wraps that model for UK insurance use.
 ## Install
 
 ```bash
-uv pip install insurance-spatial
+uv add insurance-spatial
 ```
 
 With optional geo dependencies (for loading shapefiles and spatial weights):
 ```bash
-uv pip install "insurance-spatial[geo]"
+uv add "insurance-spatial[geo]"
 ```
 
 With faster sampler:
 ```bash
-uv pip install "insurance-spatial[nutpie]"
+uv add "insurance-spatial[nutpie]"
 ```
 
 ## Quickstart
@@ -147,7 +147,7 @@ For N=11,200 UK postcode sectors, the ICAR model is feasible - the pairwise diff
 
 For exploratory work on district-level data (N≈3,000), a full run takes under 10 minutes.
 
-nutpie is recommended for production: `uv pip install nutpie`. It uses a Rust NUTS implementation and is typically 2–5x faster than PyMC's default sampler for models of this type.
+nutpie is recommended for production: `uv add nutpie`. It uses a Rust NUTS implementation and is typically 2–5x faster than PyMC's default sampler for models of this type.
 
 ## References
 
