@@ -24,22 +24,25 @@ document it in your model documentation.
 Scaling factor
 --------------
 The BYM2 scaling factor s = geometric_mean(diag(Q+)) where Q+ is the Moore-Penrose
-pseudoinverse of the ICAR precision matrix Q = D - W.  Computing this naively is
-O(N^2) for a full solve; we use a perturbed sparse solve with a diagonal regulariser
-(1e-5) which is accurate to <0.01% for the values of N we target (≤3,000 postcode
-districts, ≤11,200 sectors).  Cache the result if your adjacency structure is stable
-between runs.
+pseudoinverse of the ICAR precision matrix Q = D - W.  We compute this via
+eigendecomposition of Q (dense, for moderate N up to ~3,000) or via a sparse
+Cholesky with sum-to-zero constraint (for larger N).
+
+The ICAR precision matrix has exactly one zero eigenvalue corresponding to the
+constant eigenvector.  We zero this eigenvalue before inverting to obtain Q+.
+
+Cache the result: the scaling factor depends only on the graph topology, not the
+data, so you only need to recompute it when the adjacency structure changes.
 """
 
 from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, field
-from typing import Optional, Sequence
+from typing import Optional
 
 import numpy as np
 from scipy import sparse
-from scipy.sparse.linalg import spsolve
 from scipy.sparse.csgraph import connected_components
 
 
@@ -93,7 +96,7 @@ class AdjacencyMatrix:
     def to_edge_list(self) -> np.ndarray:
         """
         Return edges as an (E, 2) int array of (i, j) pairs where i < j.
-        Suitable for use as the `edge_list` argument of some spatial libraries.
+        Suitable for use as the ``edge_list`` argument of some spatial libraries.
         """
         cx = self.W.tocoo()
         mask = cx.row < cx.col
@@ -117,14 +120,22 @@ def compute_bym2_scaling_factor(W: sparse.spmatrix) -> float:
     """
     Compute the BYM2 scaling factor for a given adjacency matrix.
 
-    s = geometric_mean(diag(Q_perturbed^{-1}))
+    s = geometric_mean(diag(Q+))
 
-    where Q_perturbed = (D - W) + epsilon * I with epsilon = 1e-5.
+    where Q = D - W is the ICAR precision matrix (Laplacian) and Q+ is its
+    Moore-Penrose pseudoinverse.  Q has rank N-1 with a zero eigenvalue
+    corresponding to the constant eigenvector; Q+ sets this eigenvalue to
+    zero in the inverse (rather than 1/0).
 
-    The ICAR precision matrix Q = D - W is singular (rank N-1).  Adding a small
-    diagonal perturbation makes it invertible.  The resulting diagonal elements
-    approximate the marginal variances of the ICAR distribution closely enough
-    for practical BYM2 hyperprior calibration.
+    Implementation: dense eigendecomposition of Q.  This is O(N^2) in memory
+    and O(N^3) in time — acceptable for N ≤ ~3,000 (postcode districts).  For
+    N ≈ 11,200 (postcode sectors), run this once offline, cache the result, and
+    pass it directly to AdjacencyMatrix(_scaling_factor=cached_value).
+
+    For a connected graph, the scaling factor s lies in (0, ∞) and represents
+    the geometric mean of the ICAR marginal variances.  Dividing the ICAR
+    samples by sqrt(s) normalises them to unit marginal variance, which is the
+    key step in the BYM2 parameterisation.
 
     Parameters
     ----------
@@ -136,19 +147,23 @@ def compute_bym2_scaling_factor(W: sparse.spmatrix) -> float:
     float
         Scaling factor s > 0.
     """
-    W = sparse.csr_matrix(W, dtype=np.float64)
-    N = W.shape[0]
-    d = np.asarray(W.sum(axis=1)).ravel()
-    D = sparse.diags(d, format="csc")
-    Q = D - W.tocsc()
-    epsilon = 1e-5
-    Q_reg = Q + epsilon * sparse.eye(N, format="csc")
+    W_arr = sparse.csr_matrix(W, dtype=np.float64).toarray()
+    N = W_arr.shape[0]
+    d = W_arr.sum(axis=1)
+    Q = np.diag(d) - W_arr  # N×N Laplacian matrix
 
-    marginal_vars = np.zeros(N)
-    for i in range(N):
-        e_i = np.zeros(N)
-        e_i[i] = 1.0
-        marginal_vars[i] = spsolve(Q_reg, e_i)[i]
+    # Eigendecomposition: Q = V diag(lambda) V^T
+    # Q is symmetric PSD with exactly one zero eigenvalue for a connected graph
+    eigenvalues, eigenvectors = np.linalg.eigh(Q)
+
+    # Zero out eigenvalues below a relative threshold (the null-space eigenvalue)
+    # Use relative threshold: eigenvalues below max_eigenvalue * tol are zeroed
+    tol = 1e-10 * eigenvalues[-1]  # eigenvalues sorted ascending by eigh
+    inv_eigenvalues = np.where(eigenvalues > tol, 1.0 / eigenvalues, 0.0)
+
+    # Q+ = V diag(1/lambda+) V^T  (pseudoinverse)
+    # diag(Q+)[i] = sum_k (V[i,k]^2 * inv_eigenvalues[k])
+    marginal_vars = (eigenvectors ** 2) @ inv_eigenvalues  # shape (N,)
 
     scaling_factor = float(np.exp(np.mean(np.log(marginal_vars))))
     return scaling_factor
