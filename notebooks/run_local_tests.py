@@ -10,36 +10,41 @@
 
 import subprocess
 import sys
+import os
 
-result = subprocess.run(
-    ["git", "clone", "--depth=1", "https://github.com/burningcost/insurance-spatial.git", "/tmp/insurance-spatial-local"],
+# Clone the repo to get the test files
+clone = subprocess.run(
+    ["git", "clone", "--depth=1", "https://github.com/burningcost/insurance-spatial.git", "/tmp/ins-spatial"],
     capture_output=True, text=True
 )
-print("Clone stdout:", result.stdout)
-print("Clone stderr:", result.stderr)
+print("Clone:", clone.returncode, clone.stderr[:200] if clone.returncode != 0 else "OK")
 
 # COMMAND ----------
 
-# Run only the fast tests (skip integration tests)
+env = {**os.environ, "PYTHONPATH": "/tmp/ins-spatial/src"}
+
 result = subprocess.run(
     [
         sys.executable, "-m", "pytest",
-        "/tmp/insurance-spatial-local/tests/test_adjacency.py",
-        "/tmp/insurance-spatial-local/tests/test_diagnostics.py",
-        "/tmp/insurance-spatial-local/tests/test_relativities.py",
+        "/tmp/ins-spatial/tests/test_adjacency.py",
+        "/tmp/ins-spatial/tests/test_diagnostics.py",
+        "/tmp/ins-spatial/tests/test_relativities.py",
         "-v",
         "--tb=long",
+        "--no-header",
     ],
     capture_output=True, text=True,
-    cwd="/tmp/insurance-spatial-local",
-    env={**__import__('os').environ, "PYTHONPATH": "/tmp/insurance-spatial-local/src"},
+    cwd="/tmp/ins-spatial",
+    env=env,
 )
 
-# Always print full output regardless of exit code
-output = result.stdout + "\n" + result.stderr
-print(output[-10000:] if len(output) > 10000 else output)
+full_output = result.stdout + "\n--- STDERR ---\n" + result.stderr
+# Truncate for display but keep the most useful part (tail)
+display_output = full_output[-8000:] if len(full_output) > 8000 else full_output
+print(display_output)
 
-if result.returncode != 0:
-    raise RuntimeError(f"Tests failed with return code {result.returncode}")
-else:
-    print("\nAll fast tests passed.")
+# COMMAND ----------
+
+# Exit with the output so it appears in notebook_output.result
+exit_message = f"returncode={result.returncode}\n" + display_output[-3000:]
+dbutils.notebook.exit(exit_message)
