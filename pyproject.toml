@@ -1,0 +1,81 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "insurance-spatial"
+version = "0.1.0"
+description = "BYM2 spatial territory ratemaking for UK personal lines insurance"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [
+    { name = "Burning Cost", email = "pricing.frontier@gmail.com" },
+]
+keywords = [
+    "insurance",
+    "pricing",
+    "spatial",
+    "BYM2",
+    "ICAR",
+    "territory",
+    "postcode",
+    "actuarial",
+    "UK",
+    "ratemaking",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Office/Business :: Financial",
+]
+dependencies = [
+    "numpy>=1.25",
+    "polars>=0.20",
+    "scipy>=1.11",
+    "pymc>=5.10",
+    "pytensor>=2.18",
+    "arviz>=0.17",
+]
+
+[project.optional-dependencies]
+geo = [
+    "geopandas>=0.14",
+    "shapely>=2.0",
+    "libpysal>=4.9",
+]
+diagnostics = [
+    "esda>=2.6",
+    "libpysal>=4.9",
+]
+plots = [
+    "matplotlib>=3.7",
+    "geopandas>=0.14",
+]
+nutpie = [
+    "nutpie>=0.9",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[project.urls]
+Repository = "https://github.com/burningcost/insurance-spatial"
+Issues = "https://github.com/burningcost/insurance-spatial/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/insurance_spatial"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
