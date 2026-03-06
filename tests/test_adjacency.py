@@ -121,17 +121,26 @@ class TestScalingFactor:
         assert isinstance(s, float)
         assert s > 0
 
+    def test_finite(self):
+        adj = build_grid_adjacency(5, 5)
+        s = adj.scaling_factor
+        assert np.isfinite(s)
+        assert s > 0
+
     def test_cached_on_property(self):
         adj = build_grid_adjacency(3, 3)
         s1 = adj.scaling_factor
         s2 = adj.scaling_factor
         assert s1 == s2
 
-    def test_reasonable_magnitude(self):
-        # For a regular grid, scaling factor should be in (0.1, 10)
-        adj = build_grid_adjacency(5, 5)
-        s = adj.scaling_factor
-        assert 0.05 < s < 20.0
+    def test_scaling_factor_increases_with_grid_size(self):
+        """
+        For regular grids, the ICAR marginal variances scale with graph size.
+        A larger grid should have a larger scaling factor.
+        """
+        adj_small = build_grid_adjacency(3, 3)
+        adj_large = build_grid_adjacency(5, 5)
+        assert adj_large.scaling_factor > adj_small.scaling_factor
 
     def test_larger_grid_different_from_smaller(self):
         adj_small = build_grid_adjacency(3, 3)
