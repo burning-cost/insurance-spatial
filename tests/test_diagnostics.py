@@ -1,7 +1,7 @@
 """
 Tests for the diagnostics module.
 
-Moran's I tests run locally — no model fitting required.
+Moran's I tests run locally - no model fitting required.
 Convergence diagnostics tests require a fitted BYM2Result and are marked
 with @pytest.mark.databricks so they run only in the Databricks CI environment.
 """
@@ -19,7 +19,7 @@ class TestMoranI:
         A north-south gradient should yield a positive, significant Moran's I
         on a 5×5 rook grid.
         """
-        # Values increase by row — strong spatial structure
+        # Values increase by row - strong spatial structure
         values = np.array([float(i // 5) for i in range(25)])
         result = moran_i(values, grid_5x5, n_permutations=499)
         assert isinstance(result, MoranI)
@@ -29,13 +29,13 @@ class TestMoranI:
     def test_random_values_not_significant(self, grid_5x5):
         """
         Random values should not show significant spatial autocorrelation
-        (at α=0.05, we expect this to fail ~5% of the time — but with a fixed
+        (at α=0.05, we expect this to fail ~5% of the time - but with a fixed
         seed and 25 nodes it should be reliably non-significant).
         """
         rng = np.random.default_rng(0)
         values = rng.standard_normal(25)
         result = moran_i(values, grid_5x5, n_permutations=499)
-        # Not testing significance here — just that the function runs
+        # Not testing significance here - just that the function runs
         assert isinstance(result.statistic, float)
         assert isinstance(result.p_value, float)
         assert 0.0 <= result.p_value <= 1.0

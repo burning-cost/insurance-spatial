@@ -128,7 +128,7 @@ def moran_i(
     Parameters
     ----------
     values :
-        Array of shape (N,) — e.g. log(O/E) residuals per area.
+        Array of shape (N,) - e.g. log(O/E) residuals per area.
     adjacency :
         AdjacencyMatrix with N areas matching the length of values.
     n_permutations :
@@ -232,7 +232,7 @@ def convergence_summary(result: "BYM2Result") -> ConvergenceSummary:
 
     # Scalar parameters of primary interest
     scalar_params = ["alpha", "sigma", "rho"]
-    # Vector parameters — summarise by max R-hat / min ESS
+    # Vector parameters - summarise by max R-hat / min ESS
     vector_params = ["phi", "theta", "b"]
 
     for param in scalar_params:
@@ -291,7 +291,7 @@ def compute_diagnostics(result: "BYM2Result") -> SpatialDiagnostics:
 
     Includes convergence statistics and posterior summaries of the key
     hyperparameters (rho and sigma).  Moran's I on posterior residuals is
-    not computed here — call moran_i() separately on your pre-fit residuals.
+    not computed here - call moran_i() separately on your pre-fit residuals.
     """
     try:
         import arviz as az

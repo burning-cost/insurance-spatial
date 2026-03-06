@@ -6,7 +6,7 @@ BYM2 spatial territory ratemaking for UK personal lines insurance.
 
 Territory pricing in UK personal lines is broken in predictable ways.
 
-The standard approach — a GLM with postcode sector as a categorical predictor — creates 11,200 separate territory parameters for motor, most of them estimated from a handful of claims. Adjacent sectors can differ by 30–40% on sparse data not because the underlying risk differs but because the estimates are noisy. Standard practice is to band sectors into 6–20 groups using k-means on historical loss ratios. This is ad hoc, discards information, and creates artificial discontinuities at band boundaries.
+The standard approach - a GLM with postcode sector as a categorical predictor - creates 11,200 separate territory parameters for motor, most of them estimated from a handful of claims. Adjacent sectors can differ by 30–40% on sparse data not because the underlying risk differs but because the estimates are noisy. Standard practice is to band sectors into 6–20 groups using k-means on historical loss ratios. This is ad hoc, discards information, and creates artificial discontinuities at band boundaries.
 
 GBMs handle territory implicitly but produce an uninterpretable spatial effect diffused across hundreds of splits. You cannot extract a territory factor for regulatory filing or actuarial peer review.
 
@@ -19,10 +19,10 @@ This library wraps that model for UK insurance use.
 ## What it does
 
 - **Builds adjacency matrices** from GeoJSON polygon files or simple grids
-- **Fits BYM2 Poisson models** via PyMC v5's `pm.ICAR` — the structured spatial component captures smooth geographic variation; the IID component captures area-specific outliers
+- **Fits BYM2 Poisson models** via PyMC v5's `pm.ICAR` - the structured spatial component captures smooth geographic variation; the IID component captures area-specific outliers
 - **Tests for spatial autocorrelation** using Moran's I before and after fitting
 - **Extracts territory relativities** as multiplicative factors with credibility intervals, ready to use as GLM offsets
-- **Reports convergence** — R-hat, ESS, divergences — because MCMC without diagnostics is not production-ready
+- **Reports convergence** - R-hat, ESS, divergences - because MCMC without diagnostics is not production-ready
 
 ## Install
 
@@ -46,7 +46,7 @@ uv pip install "insurance-spatial[nutpie]"
 from insurance_spatial import build_grid_adjacency, BYM2Model
 from insurance_spatial.diagnostics import moran_i
 
-# 1. Build adjacency (synthetic grid — use from_geojson() for real data)
+# 1. Build adjacency (synthetic grid - use from_geojson() for real data)
 adj = build_grid_adjacency(10, 10, connectivity="queen")
 print(f"Scaling factor: {adj.scaling_factor:.3f}")
 
@@ -102,7 +102,7 @@ sigma ~ HalfNormal(1)   # total territory SD
 rho ~ Beta(0.5, 0.5)    # proportion attributable to spatial structure
 ```
 
-`s` is the BYM2 scaling factor — the geometric mean of the marginal variances of the ICAR precision matrix. It ensures `phi` has unit variance, so `rho` and `sigma` are interpretable regardless of the graph topology.
+`s` is the BYM2 scaling factor - the geometric mean of the marginal variances of the ICAR precision matrix. It ensures `phi` has unit variance, so `rho` and `sigma` are interpretable regardless of the graph topology.
 
 **Why the rho parameter matters.** After fitting, the posterior of `rho` tells you directly how much of the residual geographic variation is spatially smooth. If `rho → 1`, nearby sectors genuinely tend to have similar risk; BYM2 smoothing is adding real information. If `rho → 0`, territory variation is area-specific noise; the data do not support spatial smoothing and you are better off with simpler credibility weighting.
 
@@ -125,7 +125,7 @@ result = model.fit(
 )
 ```
 
-The two-stage approach also means the territory factor is auditable independently of the main rating model — useful for regulatory filings.
+The two-stage approach also means the territory factor is auditable independently of the main rating model - useful for regulatory filings.
 
 ## UK data sources
 
@@ -143,7 +143,7 @@ See the demo notebook for a full synthetic example and comments on each data sou
 
 ## Computational notes
 
-For N=11,200 UK postcode sectors, the ICAR model is feasible — the pairwise difference formulation is O(N·K) where K≈6 mean neighbours. Published benchmarks suggest ~20–30 minutes for 4 chains × 1,000 draws on modern hardware. The scaling factor computation (`adj.scaling_factor`) is a one-off sparse linear solve per graph topology; cache it between runs.
+For N=11,200 UK postcode sectors, the ICAR model is feasible - the pairwise difference formulation is O(N·K) where K≈6 mean neighbours. Published benchmarks suggest ~20–30 minutes for 4 chains × 1,000 draws on modern hardware. The scaling factor computation (`adj.scaling_factor`) is a one-off sparse linear solve per graph topology; cache it between runs.
 
 For exploratory work on district-level data (N≈3,000), a full run takes under 10 minutes.
 

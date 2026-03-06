@@ -3,7 +3,7 @@ Plotting utilities for spatial territory models.
 
 Optional dependency: matplotlib (and geopandas for choropleth maps).
 
-Install with: pip install insurance-spatial[plots]
+Install with: uv pip install insurance-spatial[plots]
 
 All functions return matplotlib Figure objects so you can save or display them
 in whatever context you are working in.
@@ -57,7 +57,7 @@ def plot_relativities(
         import matplotlib.patches as mpatches
     except ImportError as exc:
         raise ImportError(
-            "plot_relativities requires matplotlib. pip install insurance-spatial[plots]"
+            "plot_relativities requires matplotlib. uv pip install insurance-spatial[plots]"
         ) from exc
 
     df = relativities.sort(rel_col, descending=True)
@@ -126,7 +126,7 @@ def plot_trace(
         import matplotlib.pyplot as plt
     except ImportError as exc:
         raise ImportError(
-            "plot_trace requires arviz and matplotlib. pip install arviz matplotlib"
+            "plot_trace requires arviz and matplotlib. uv uv pip install arviz matplotlib"
         ) from exc
 
     if params is None:
@@ -181,7 +181,7 @@ def plot_choropleth(
     except ImportError as exc:
         raise ImportError(
             "plot_choropleth requires geopandas and matplotlib. "
-            "pip install insurance-spatial[plots]"
+            "uv pip install insurance-spatial[plots]"
         ) from exc
 
     # Merge relativities into the GeoDataFrame

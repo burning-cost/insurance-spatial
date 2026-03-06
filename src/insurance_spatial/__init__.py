@@ -2,7 +2,7 @@
 insurance-spatial: BYM2 spatial territory ratemaking for UK personal lines.
 
 Provides adjacency construction, BYM2 model fitting via PyMC, spatial diagnostics,
-and territory relativity extraction — all in a pipeline designed to slot into an
+and territory relativity extraction - all in a pipeline designed to slot into an
 existing GLM or GBM pricing workflow.
 """
 

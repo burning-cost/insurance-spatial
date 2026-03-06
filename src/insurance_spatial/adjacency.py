@@ -3,11 +3,11 @@ Adjacency matrix construction for spatial territory models.
 
 Provides two paths:
 
-1. From a GeoDataFrame (or GeoJSON file) of polygon boundaries — uses Queen
+1. From a GeoDataFrame (or GeoJSON file) of polygon boundaries - uses Queen
    contiguity (shared edge or vertex) via libpysal. This is the preferred route
    when you have actual boundary polygons.
 
-2. From a simple grid — useful for synthetic data and testing.
+2. From a simple grid - useful for synthetic data and testing.
 
 The output is an AdjacencyMatrix dataclass that carries the N×N dense (for small
 grids) or scipy sparse adjacency matrix W, the ordered list of area identifiers,
@@ -128,7 +128,7 @@ def compute_bym2_scaling_factor(W: sparse.spmatrix) -> float:
     zero in the inverse (rather than 1/0).
 
     Implementation: dense eigendecomposition of Q.  This is O(N^2) in memory
-    and O(N^3) in time — acceptable for N ≤ ~3,000 (postcode districts).  For
+    and O(N^3) in time - acceptable for N ≤ ~3,000 (postcode districts).  For
     N ≈ 11,200 (postcode sectors), run this once offline, cache the result, and
     pass it directly to AdjacencyMatrix(_scaling_factor=cached_value).
 
@@ -184,8 +184,8 @@ def build_grid_adjacency(
     nrows, ncols :
         Grid dimensions.
     connectivity :
-        ``"rook"`` — shared edge only (4-connectivity).
-        ``"queen"`` — shared edge or vertex (8-connectivity).
+        ``"rook"`` - shared edge only (4-connectivity).
+        ``"queen"`` - shared edge or vertex (8-connectivity).
 
     Returns
     -------

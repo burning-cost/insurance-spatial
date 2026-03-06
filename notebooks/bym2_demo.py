@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # BYM2 Spatial Territory Ratemaking — Demo
+# MAGIC # BYM2 Spatial Territory Ratemaking - Demo
 # MAGIC
 # MAGIC This notebook demonstrates the full `insurance-spatial` workflow on synthetic UK motor data.
 # MAGIC It is designed to run on Databricks serverless compute (Python 3.10+).
@@ -12,7 +12,7 @@
 # MAGIC 4. Fit a BYM2 Poisson territory model via PyMC
 # MAGIC 5. Inspect convergence diagnostics (R-hat, ESS, divergences)
 # MAGIC 6. Extract territory relativities as a Polars DataFrame
-# MAGIC 7. Interpret the rho parameter — how much of the variation is genuinely spatial?
+# MAGIC 7. Interpret the rho parameter - how much of the variation is genuinely spatial?
 
 # COMMAND ----------
 
@@ -214,9 +214,9 @@ sigma_mean = float(diag.sigma_summary["mean"][0])
 print(f"\n  Interpretation:")
 print(f"  {100*rho_mean:.0f}% of territory variance is spatially structured.")
 if rho_mean > 0.5:
-    print("  Strong spatial signal — BYM2 smoothing is adding value.")
+    print("  Strong spatial signal - BYM2 smoothing is adding value.")
 else:
-    print("  Weak spatial signal — variation is mostly area-specific noise.")
+    print("  Weak spatial signal - variation is mostly area-specific noise.")
 print(f"  Typical territory effect: exp(sigma) ≈ {np.exp(sigma_mean):.2f}x")
 
 # COMMAND ----------
@@ -247,7 +247,7 @@ print(
 # MAGIC %md
 # MAGIC ### Using relativities as a GLM offset
 # MAGIC
-# MAGIC The `ln_offset` column is log(relativity) — ready to use as a fixed offset
+# MAGIC The `ln_offset` column is log(relativity) - ready to use as a fixed offset
 # MAGIC in an Emblem or other GLM:
 # MAGIC
 # MAGIC ```
@@ -302,12 +302,12 @@ else:
 # MAGIC
 # MAGIC This demo showed the core `insurance-spatial` workflow:
 # MAGIC
-# MAGIC 1. **Adjacency** — built from a synthetic grid; in production, use `from_geojson()` with ONS sector boundaries
-# MAGIC 2. **Pre-fit diagnostic** — Moran's I confirmed spatial autocorrelation, justifying BYM2
-# MAGIC 3. **BYM2 fit** — PyMC MCMC with ICAR spatial component and IID noise component
-# MAGIC 4. **Convergence** — R-hat and ESS checks (run longer chains for production)
-# MAGIC 5. **Relativities** — extracted as multiplicative factors with credibility intervals
-# MAGIC 6. **Post-fit diagnostic** — confirmed spatial structure absorbed
+# MAGIC 1. **Adjacency** - built from a synthetic grid; in production, use `from_geojson()` with ONS sector boundaries
+# MAGIC 2. **Pre-fit diagnostic** - Moran's I confirmed spatial autocorrelation, justifying BYM2
+# MAGIC 3. **BYM2 fit** - PyMC MCMC with ICAR spatial component and IID noise component
+# MAGIC 4. **Convergence** - R-hat and ESS checks (run longer chains for production)
+# MAGIC 5. **Relativities** - extracted as multiplicative factors with credibility intervals
+# MAGIC 6. **Post-fit diagnostic** - confirmed spatial structure absorbed
 # MAGIC
 # MAGIC ### Production checklist
 # MAGIC

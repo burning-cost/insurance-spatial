@@ -186,7 +186,7 @@ class BYM2Model:
         covariates :
             Optional float array of shape (N, P) containing area-level covariates
             (e.g. IMD score, crime rate).  These enter as fixed effects (beta).
-            Scale them before passing — the prior on beta is Normal(0, 1).
+            Scale them before passing - the prior on beta is Normal(0, 1).
         random_seed :
             Integer seed for reproducibility.
 
