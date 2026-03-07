@@ -29,7 +29,7 @@ except ImportError:
 
 requires_pymc = pytest.mark.skipif(
     SKIP_HEAVY,
-    reason="PyMC not installed. Run on Databricks: uv pip install pymc"
+    reason="PyMC not installed. Run on Databricks: uv add pymc"
 )
 
 

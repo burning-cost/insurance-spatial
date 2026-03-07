@@ -218,7 +218,7 @@ def convergence_summary(result: "BYM2Result") -> ConvergenceSummary:
     try:
         import arviz as az
     except ImportError as exc:
-        raise ImportError("convergence_summary requires arviz. pip install arviz") from exc
+        raise ImportError("convergence_summary requires arviz. uv add arviz") from exc
 
     trace = result.trace
 
@@ -296,7 +296,7 @@ def compute_diagnostics(result: "BYM2Result") -> SpatialDiagnostics:
     try:
         import arviz as az
     except ImportError as exc:
-        raise ImportError("diagnostics require arviz. pip install arviz") from exc
+        raise ImportError("diagnostics require arviz. uv add arviz") from exc
 
     conv = convergence_summary(result)
 
