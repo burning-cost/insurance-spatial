@@ -7,7 +7,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install "git+https://github.com/burningcost/insurance-spatial.git" pymc arviz polars xarray pytest
+# MAGIC %pip install "git+https://github.com/burning-cost/insurance-spatial.git" pymc arviz polars xarray pytest
 
 # COMMAND ----------
 
@@ -16,7 +16,7 @@ import sys
 
 # Clone the repo to get the test files
 result = subprocess.run(
-    ["git", "clone", "--depth=1", "https://github.com/burningcost/insurance-spatial.git", "/tmp/insurance-spatial"],
+    ["git", "clone", "--depth=1", "https://github.com/burning-cost/insurance-spatial.git", "/tmp/insurance-spatial"],
     capture_output=True, text=True
 )
 print(result.stdout)

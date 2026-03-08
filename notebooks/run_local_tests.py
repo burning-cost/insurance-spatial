@@ -4,7 +4,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install "git+https://github.com/burningcost/insurance-spatial.git" polars scipy numpy xarray pytest
+# MAGIC %pip install "git+https://github.com/burning-cost/insurance-spatial.git" polars scipy numpy xarray pytest
 
 # COMMAND ----------
 
@@ -14,7 +14,7 @@ import os
 
 # Clone the repo to get the test files
 clone = subprocess.run(
-    ["git", "clone", "--depth=1", "https://github.com/burningcost/insurance-spatial.git", "/tmp/ins-spatial"],
+    ["git", "clone", "--depth=1", "https://github.com/burning-cost/insurance-spatial.git", "/tmp/ins-spatial"],
     capture_output=True, text=True
 )
 print("Clone:", clone.returncode, clone.stderr[:200] if clone.returncode != 0 else "OK")
