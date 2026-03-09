@@ -9,7 +9,7 @@ BYM2 spatial territory ratemaking for UK personal lines insurance.
 
 Territory pricing in UK personal lines is broken in predictable ways.
 
-The standard approach - a GLM with postcode sector as a categorical predictor - creates 11,200 separate territory parameters for motor, most of them estimated from a handful of claims. Adjacent sectors can differ by 30–40% on sparse data not because the underlying risk differs but because the estimates are noisy. Standard practice is to band sectors into 6–20 groups using k-means on historical loss ratios. This is ad hoc, discards information, and creates artificial discontinuities at band boundaries.
+The standard approach — a GLM with postcode sector as a categorical predictor — creates 11,200 separate territory parameters for motor, most of them estimated from a handful of claims. Adjacent sectors can differ by 30–40% on sparse data not because the underlying risk differs but because the estimates are noisy. Standard practice is to band sectors into 6–20 groups using k-means on historical loss ratios. This is ad hoc, discards information, and creates artificial discontinuities at band boundaries.
 
 GBMs handle territory implicitly but produce an uninterpretable spatial effect diffused across hundreds of splits. You cannot extract a territory factor for regulatory filing or actuarial peer review.
 
@@ -22,12 +22,12 @@ This library wraps that model for UK insurance use.
 ## What it does
 
 - **Builds adjacency matrices** from GeoJSON polygon files or simple grids
-- **Fits BYM2 Poisson models** via PyMC v5's `pm.ICAR` - the structured spatial component captures smooth geographic variation; the IID component captures area-specific outliers
+- **Fits BYM2 Poisson models** via PyMC v5's `pm.ICAR` — the structured spatial component captures smooth geographic variation; the IID component captures area-specific outliers
 - **Tests for spatial autocorrelation** using Moran's I before and after fitting
 - **Extracts territory relativities** as multiplicative factors with credibility intervals, ready to use as GLM offsets
-- **Reports convergence** - R-hat, ESS, divergences - because MCMC without diagnostics is not production-ready
+- **Reports convergence** — R-hat, ESS, divergences — because MCMC without diagnostics is not production-ready
 
-## Install
+## Installation
 
 ```bash
 uv add insurance-spatial
@@ -43,13 +43,13 @@ With faster sampler:
 uv add "insurance-spatial[nutpie]"
 ```
 
-## Quickstart
+## Quick start
 
 ```python
 from insurance_spatial import build_grid_adjacency, BYM2Model
 from insurance_spatial.diagnostics import moran_i
 
-# 1. Build adjacency (synthetic grid - use from_geojson() for real data)
+# 1. Build adjacency (synthetic grid — use from_geojson() for real data)
 adj = build_grid_adjacency(10, 10, connectivity="queen")
 print(f"Scaling factor: {adj.scaling_factor:.3f}")
 
@@ -105,7 +105,7 @@ sigma ~ HalfNormal(1)   # total territory SD
 rho ~ Beta(0.5, 0.5)    # proportion attributable to spatial structure
 ```
 
-`s` is the BYM2 scaling factor - the geometric mean of the marginal variances of the ICAR precision matrix. It ensures `phi` has unit variance, so `rho` and `sigma` are interpretable regardless of the graph topology.
+`s` is the BYM2 scaling factor — the geometric mean of the marginal variances of the ICAR precision matrix. It ensures `phi` has unit variance, so `rho` and `sigma` are interpretable regardless of the graph topology.
 
 **Why the rho parameter matters.** After fitting, the posterior of `rho` tells you directly how much of the residual geographic variation is spatially smooth. If `rho → 1`, nearby sectors genuinely tend to have similar risk; BYM2 smoothing is adding real information. If `rho → 0`, territory variation is area-specific noise; the data do not support spatial smoothing and you are better off with simpler credibility weighting.
 
@@ -128,7 +128,7 @@ result = model.fit(
 )
 ```
 
-The two-stage approach also means the territory factor is auditable independently of the main rating model - useful for regulatory filings.
+The two-stage approach also means the territory factor is auditable independently of the main rating model — useful for regulatory filings.
 
 ## UK data sources
 
@@ -146,57 +146,34 @@ See the demo notebook for a full synthetic example and comments on each data sou
 
 ## Computational notes
 
-For N=11,200 UK postcode sectors, the ICAR model is feasible - the pairwise difference formulation is O(N·K) where K≈6 mean neighbours. Published benchmarks suggest ~20–30 minutes for 4 chains × 1,000 draws on modern hardware. The scaling factor computation (`adj.scaling_factor`) is a one-off sparse linear solve per graph topology; cache it between runs.
+For N=11,200 UK postcode sectors, the ICAR model is feasible — the pairwise difference formulation is O(N·K) where K≈6 mean neighbours. Published benchmarks suggest ~20–30 minutes for 4 chains × 1,000 draws on modern hardware. The scaling factor computation (`adj.scaling_factor`) is a one-off sparse linear solve per graph topology; cache it between runs.
 
 For exploratory work on district-level data (N≈3,000), a full run takes under 10 minutes.
 
 nutpie is recommended for production: `uv add nutpie`. It uses a Rust NUTS implementation and is typically 2–5x faster than PyMC's default sampler for models of this type.
 
+## Related libraries
+
+| Library | Why it's relevant |
+|---------|------------------|
+| [insurance-multilevel](https://github.com/burning-cost/insurance-multilevel) | Broker and scheme random effects — the same credibility-weighting logic applied to group factors instead of territory |
+| [credibility](https://github.com/burning-cost/credibility) | Bühlmann-Straub closed-form credibility — simpler alternative when spatial correlation is not the primary concern |
+| [shap-relativities](https://github.com/burning-cost/shap-relativities) | Extract the base model's implicit territory effect before passing O/E ratios to BYM2 |
+| [insurance-causal](https://github.com/burning-cost/insurance-causal) | Test whether a postcode factor is a genuine risk driver or a proxy for a protected characteristic |
+| [insurance-demand](https://github.com/burning-cost/insurance-demand) | Conversion and retention modelling — territory is a key feature in demand models |
+
+[All Burning Cost libraries →](https://burning-cost.github.io)
+
+## Read more
+
+[Your Territory Banding Is Wrong](https://burning-cost.github.io/blog/spatial-territory-ratemaking-with-bym2) — why k-means banding of postcode sectors discards information and how BYM2 spatial smoothing fixes the fundamental estimation problem.
+
 ## References
 
 - Riebler, A., Sørbye, S.H., Simpson, D., & Rue, H. (2016). An intuitive Bayesian spatial model for disease mapping that accounts for scaling. *Statistical Methods in Medical Research*, 25(4), 1145–1165.
 - Gschlössl, S., Schelldorfer, J., & Schnaus, M. (2019). Spatial statistical modelling of insurance risk. *Scandinavian Actuarial Journal*.
-- Besag, J., York, J., & Mollié, A. (1991). Bayesian image restoration, with two applications in spatial statistics. *Annals of the Institute of Statistical Mathematics*, 43(1), 1–20.
+- Besag, J., York, J., & Mollié, A. (1991). Bayesian image restoration, with two applications in spatial statistics. *Annals of the Institute of Statistical Mathematics*, 43(1), 1–40.
 - Brockman, M.J., & Wright, T.S. (1992). Statistical motor rating: making effective use of your data. *Journal of the Institute of Actuaries*, 119, 457–543.
-
----
-
-## Other Burning Cost libraries
-
-**Model building**
-
-| Library | Description |
-|---------|-------------|
-| [shap-relativities](https://github.com/burningcost/shap-relativities) | Extract rating relativities from GBMs using SHAP |
-| [insurance-interactions](https://github.com/burningcost/insurance-interactions) | Automated GLM interaction detection via CANN and NID scores |
-| [insurance-cv](https://github.com/burningcost/insurance-cv) | Walk-forward cross-validation respecting IBNR structure |
-
-**Uncertainty quantification**
-
-| Library | Description |
-|---------|-------------|
-| [insurance-conformal](https://github.com/burningcost/insurance-conformal) | Distribution-free prediction intervals for Tweedie models |
-| [bayesian-pricing](https://github.com/burningcost/bayesian-pricing) | Hierarchical Bayesian models for thin-data segments |
-| [credibility](https://github.com/burningcost/credibility) | Bühlmann-Straub credibility weighting |
-
-**Deployment and optimisation**
-
-| Library | Description |
-|---------|-------------|
-| [rate-optimiser](https://github.com/burningcost/rate-optimiser) | Constrained rate change optimisation with FCA PS21/5 compliance |
-| [insurance-demand](https://github.com/burningcost/insurance-demand) | Conversion, retention, and price elasticity modelling |
-
-**Governance**
-
-| Library | Description |
-|---------|-------------|
-| [insurance-fairness](https://github.com/burningcost/insurance-fairness) | Proxy discrimination auditing for UK insurance models |
-| [insurance-causal](https://github.com/burningcost/insurance-causal) | Double Machine Learning for causal pricing inference |
-| [insurance-monitoring](https://github.com/burningcost/insurance-monitoring) | Model monitoring: PSI, A/E ratios, Gini drift test |
-
-[All libraries →](https://burningcost.github.io)
-
----
 
 ## Licence
 
