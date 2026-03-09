@@ -19,6 +19,7 @@ __all__ = [
     "MoranI",
     "convergence_summary",
     "extract_relativities",
+    "__version__",
 ]
 
 __version__ = "0.1.0"
