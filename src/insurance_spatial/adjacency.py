@@ -256,7 +256,7 @@ def from_geojson(
     except ImportError as exc:
         raise ImportError(
             "from_geojson() requires geopandas and libpysal. "
-            "Install with: uv add "insurance-spatial[geo]""
+            "Install with: pip install 'insurance-spatial[geo]'"
         ) from exc
 
     gdf = gpd.read_file(path)
