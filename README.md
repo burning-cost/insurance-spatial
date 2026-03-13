@@ -226,6 +226,27 @@ For N=11,200 UK postcode sectors, the ICAR model is feasible — the pairwise di
 
 nutpie is recommended for production: `uv add nutpie`. It uses a Rust NUTS implementation and is typically 2–5x faster than PyMC's default sampler for models of this type.
 
+---
+
+## Performance
+
+Benchmarked against **flat territory banding** (5 quintile bands by raw observed frequency) and the **grand mean** on a synthetic 12×12 grid of territories (144 areas) with known DGP and genuine spatial autocorrelation. MSE evaluated against true DGP rates. Full notebook: `notebooks/benchmark.py`.
+
+| Metric | Grand mean | Flat bands (5 quintiles) | BYM2 |
+|--------|-----------|--------------------------|------|
+| Overall MSE vs true rates | highest | moderate | lowest |
+| Thin territory MSE | moderate | high (noisy raw rates banded) | lowest |
+| Thick territory MSE | highest | low | matches thick raw |
+| Moran's I on residuals | high (signal remains) | moderate (artefact edges) | near zero (spatial signal absorbed) |
+| Fit time | instant | instant | 3–8 min (MCMC, 500 draws × 2 chains) |
+
+The Moran's I comparison is the diagnostic that matters here. Flat banding leaves detectable spatial autocorrelation in the residuals — the band boundaries are artefacts of sampling variation, not genuine rate cliffs. BYM2's posterior residuals show Moran's I near zero, meaning the spatial signal has been captured. The rho parameter from the fitted model also tells you directly how much of the residual territory variation is genuinely spatial vs. area-specific noise.
+
+**When to use:** UK personal lines territory pricing where postcode sectors have heterogeneous exposure depths, genuine spatial gradients in risk (urban/rural, deprivation, theft patterns), and where band discontinuities at district boundaries create conduct risk under Consumer Duty. The two-stage approach (main GLM without territory, then BYM2 on O/E residuals) keeps the spatial model auditable independently.
+
+**When NOT to use:** When spatial autocorrelation is not present (test with Moran's I before fitting — the library includes `moran_i()`), or when the rho posterior is near zero (meaning the data do not support spatial smoothing and simpler credibility weighting suffices). The 3–8 minute MCMC runtime per territory refresh is acceptable for monthly or quarterly batch cycles but not for real-time use.
+
+
 ## Related libraries
 
 | Library | Why it's relevant |
