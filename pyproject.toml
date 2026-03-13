@@ -40,7 +40,7 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.25",
-    "polars>=0.20",
+    "polars>=1.0",
     "scipy>=1.11",
     "arviz>=0.17",
     # conformal sub-package dependencies
