@@ -3,29 +3,38 @@
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![License: MIT](https://img.shields.io/badge/license-MIT-green) ![PyPI](https://img.shields.io/pypi/v/insurance-spatial)
 
-BYM2 spatial territory ratemaking for UK personal lines insurance.
+Spatial tools for UK insurance pricing in one install: BYM2 territory ratemaking and spatially weighted conformal prediction intervals.
 
-## The Problem
+## The Problems
 
-Territory pricing in UK personal lines is broken in predictable ways.
+**Territory pricing** in UK personal lines is broken in predictable ways.
 
 The standard approach — a GLM with postcode sector as a categorical predictor — creates 11,200 separate territory parameters for motor, most of them estimated from a handful of claims. Adjacent sectors can differ by 30–40% on sparse data not because the underlying risk differs but because the estimates are noisy. Standard practice is to band sectors into 6–20 groups using k-means on historical loss ratios. This is ad hoc, discards information, and creates artificial discontinuities at band boundaries.
 
-GBMs handle territory implicitly but produce an uninterpretable spatial effect diffused across hundreds of splits. You cannot extract a territory factor for regulatory filing or actuarial peer review.
-
-Vendor tools (Emblem, Akur8) have some form of spatial smoothing, but the methodology is proprietary. When the FCA asks how your territory factors are derived, "the platform did it" is not a satisfying answer.
-
 The academically-grounded alternative is the **BYM2 model** (Besag-York-Mollié, Riebler et al. 2016): a Bayesian hierarchical model that borrows strength across neighbouring postcode sectors, quantifies how much geographic variation is genuinely spatial vs. idiosyncratic noise, and produces territory relativities with proper uncertainty estimates.
 
-This library wraps that model for UK insurance use.
+**Prediction intervals** from a pricing model are nationally calibrated but geographically broken. Standard conformal prediction gives you a guarantee that 90% of risks are covered nationwide — but the coverage can be 70% in inner London and 98% in rural Somerset. That geographic miscalibration is a conduct risk under Consumer Duty.
 
-## What it does
+The fix is spatially weighted conformal prediction: calibration non-conformity scores are weighted by geographic proximity to each test point, so intervals in Taunton reflect error behaviour in the South West, not the national average.
 
-- **Builds adjacency matrices** from GeoJSON polygon files or simple grids
-- **Fits BYM2 Poisson models** via PyMC v5's `pm.ICAR` — the structured spatial component captures smooth geographic variation; the IID component captures area-specific outliers
-- **Tests for spatial autocorrelation** using Moran's I before and after fitting
-- **Extracts territory relativities** as multiplicative factors with credibility intervals, ready to use as GLM offsets
-- **Reports convergence** — R-hat, ESS, divergences — because MCMC without diagnostics is not production-ready
+## What's in this package
+
+Two sub-systems, one install:
+
+**BYM2 territory ratemaking** (`insurance_spatial` top-level):
+- Build adjacency matrices from GeoJSON polygon files or grids
+- Fit BYM2 Poisson models via PyMC v5
+- Test spatial autocorrelation with Moran's I
+- Extract territory relativities with credibility intervals, ready as GLM offsets
+- MCMC convergence diagnostics
+
+**Spatially weighted conformal prediction** (`insurance_spatial.conformal`):
+- Geographically calibrated prediction intervals for any sklearn-compatible model
+- Gaussian, Epanechnikov, and uniform spatial kernels
+- Cross-validated bandwidth selection using spatial blocking
+- Tweedie Pearson non-conformity scores (recommended for GLM/GBM pricing models)
+- MACG (Mean Absolute Coverage Gap) spatial diagnostic
+- FCA Consumer Duty table: coverage by geographic region
 
 ## Installation
 
@@ -33,17 +42,17 @@ This library wraps that model for UK insurance use.
 uv add insurance-spatial
 ```
 
-With optional geo dependencies (for loading shapefiles and spatial weights):
+With optional geo dependencies (shapefiles and spatial weights):
 ```bash
 uv add "insurance-spatial[geo]"
 ```
 
-With faster sampler:
+With faster MCMC sampler:
 ```bash
 uv add "insurance-spatial[nutpie]"
 ```
 
-## Quick start
+## BYM2 Quick Start
 
 ```python
 from insurance_spatial import build_grid_adjacency, BYM2Model
@@ -69,7 +78,6 @@ result = model.fit(
 diag = result.diagnostics()
 print(f"Max R-hat: {diag.convergence.max_rhat:.3f}")    # want < 1.01
 print(f"Min ESS:   {diag.convergence.min_ess_bulk:.0f}") # want > 400
-print(diag.rho_summary)    # how much variation is spatially structured?
 
 # 5. Extract relativities
 rels = result.territory_relativities(credibility_interval=0.95)
@@ -77,17 +85,85 @@ rels = result.territory_relativities(credibility_interval=0.95)
 # Use ln_offset as a fixed offset in your downstream GLM
 ```
 
-Loading real sector boundaries:
+## Spatial Conformal Prediction
+
+Standard conformal prediction guarantees 90% coverage nationally. It does not guarantee 90% coverage in every postcode district. This matters because the FCA expects you to demonstrate fair outcomes across geography, and systematic under-coverage in deprived areas or rural postcodes creates conduct risk.
+
+The spatially weighted conformal predictor wraps your existing fitted model and produces geographically calibrated intervals:
 
 ```python
-from insurance_spatial.adjacency import from_geojson
+from insurance_spatial.conformal import SpatialConformalPredictor, SpatialCoverageReport
 
-adj = from_geojson(
-    "postcode_sectors.geojson",
-    area_col="PC_SECTOR",
-    connectivity="queen",
-    fix_islands=True,  # connect Scottish islands to nearest mainland sector
+# Wrap your fitted GBM or GLM
+scp = SpatialConformalPredictor(
+    model=fitted_lgbm,
+    nonconformity='pearson_tweedie',  # recommended for burning cost models
+    tweedie_power=1.5,
+    bandwidth_km=20.0,  # or None to select automatically via CV
 )
+
+# Calibrate on a held-out set
+cal_result = scp.calibrate(
+    X_cal, y_cal,
+    lat=lat_cal, lon=lon_cal,  # or postcodes=['SW1A 2AA', ...]
+)
+print(f"Bandwidth: {cal_result.bandwidth_km} km")
+
+# Generate prediction intervals
+intervals = scp.predict_interval(
+    X_test, lat=lat_test, lon=lon_test, alpha=0.10  # 90% intervals
+)
+print(intervals.lower[:5], intervals.upper[:5])
+
+# Diagnose spatial coverage quality
+report = SpatialCoverageReport(scp)
+result = report.evaluate(X_val, y_val, lat=lat_val, lon=lon_val)
+print(f"MACG: {result.macg:.4f}")  # lower = more spatially uniform coverage
+
+# FCA Consumer Duty table
+table = report.fca_consumer_duty_table(region_labels=county_labels)
+print(table.filter(pl.col('flag') == 'REVIEW'))
+```
+
+Using UK postcodes instead of coordinates:
+
+```python
+from insurance_spatial.conformal import PostcodeGeocoder
+
+gc = PostcodeGeocoder()
+lat_cal, lon_cal = gc.geocode(postcodes_cal)
+scp.calibrate(X_cal, y_cal, lat=lat_cal, lon=lon_cal)
+
+# Or pass postcodes directly
+scp.calibrate(X_cal, y_cal, postcodes=postcodes_cal)
+```
+
+### Non-conformity score choice
+
+The score is the key design decision. For pricing models:
+
+| Score | When to use |
+|-------|-------------|
+| `pearson_tweedie` (default) | GLM/GBM with Tweedie objective (burning cost, severity) |
+| `pearson` | Poisson frequency models |
+| `absolute` | Baseline only — ignores heteroscedasticity |
+| `scaled_absolute` | Two-model approach with a separate spread model |
+
+The Tweedie Pearson score `|y - yhat| / yhat^(p/2)` variance-stabilises the residuals before weighting, so the spatial kernel is not confounded by the model's own heteroscedasticity.
+
+### Bandwidth selection
+
+If you do not supply `bandwidth_km`, it is selected via spatial blocking cross-validation. The CV minimises MACG (Mean Absolute Coverage Gap) across a spatial grid, which directly measures what matters — geographic coverage consistency.
+
+```python
+# Auto bandwidth selection
+scp = SpatialConformalPredictor(model=fitted_model, bandwidth_km=None)
+result = scp.calibrate(
+    X_cal, y_cal, lat=lat_cal, lon=lon_cal,
+    cv_candidates_km=[5.0, 10.0, 20.0, 30.0, 50.0],
+    cv_folds=5,
+)
+print(f"CV-selected bandwidth: {result.bandwidth_km} km")
 ```
 
 ## The BYM2 model
@@ -148,8 +224,6 @@ See the demo notebook for a full synthetic example and comments on each data sou
 
 For N=11,200 UK postcode sectors, the ICAR model is feasible — the pairwise difference formulation is O(N·K) where K≈6 mean neighbours. Published benchmarks suggest ~20–30 minutes for 4 chains × 1,000 draws on modern hardware. The scaling factor computation (`adj.scaling_factor`) is a one-off sparse linear solve per graph topology; cache it between runs.
 
-For exploratory work on district-level data (N≈3,000), a full run takes under 10 minutes.
-
 nutpie is recommended for production: `uv add nutpie`. It uses a Rust NUTS implementation and is typically 2–5x faster than PyMC's default sampler for models of this type.
 
 ## Related libraries
@@ -164,16 +238,13 @@ nutpie is recommended for production: `uv add nutpie`. It uses a Rust NUTS imple
 
 [All Burning Cost libraries →](https://burning-cost.github.io)
 
-## Read more
-
-[Your Territory Banding Is Wrong](https://burning-cost.github.io/blog/spatial-territory-ratemaking-with-bym2) — why k-means banding of postcode sectors discards information and how BYM2 spatial smoothing fixes the fundamental estimation problem.
-
 ## References
 
 - Riebler, A., Sørbye, S.H., Simpson, D., & Rue, H. (2016). An intuitive Bayesian spatial model for disease mapping that accounts for scaling. *Statistical Methods in Medical Research*, 25(4), 1145–1165.
 - Gschlössl, S., Schelldorfer, J., & Schnaus, M. (2019). Spatial statistical modelling of insurance risk. *Scandinavian Actuarial Journal*.
 - Besag, J., York, J., & Mollié, A. (1991). Bayesian image restoration, with two applications in spatial statistics. *Annals of the Institute of Statistical Mathematics*, 43(1), 1–40.
-- Brockman, M.J., & Wright, T.S. (1992). Statistical motor rating: making effective use of your data. *Journal of the Institute of Actuaries*, 119, 457–543.
+- Hjort, N. L., Jullum, M., & Loland, A. (2025). Uncertainty quantification in automated valuation models with spatially weighted conformal prediction. *IJDSA (Springer)*. doi:10.1007/s41060-025-00862-4
+- Tibshirani, R. J., Barber, R. F., Candes, E. J., & Ramdas, A. (2019). Conformal prediction under covariate shift. *NeurIPS 2019*.
 
 ## Licence
 
