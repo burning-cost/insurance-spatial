@@ -55,34 +55,47 @@ uv add "insurance-spatial[nutpie]"
 ## BYM2 Quick Start
 
 ```python
+import numpy as np
 from insurance_spatial import build_grid_adjacency, BYM2Model
 from insurance_spatial.diagnostics import moran_i
 
-# 1. Build adjacency (synthetic grid — use from_geojson() for real data)
+# 1. Build adjacency for a synthetic 10x10 grid of territories.
+#    In production, use build_grid_adjacency() from a real postcode-sector grid
+#    or AdjacencyMatrix.from_geojson() with ONSPD boundary files.
 adj = build_grid_adjacency(10, 10, connectivity="queen")
-print(f"Scaling factor: {adj.scaling_factor:.3f}")
+N = len(adj.areas)  # 100 territories
+print(f"Territories: {N}, scaling factor: {adj.scaling_factor:.3f}")
 
-# 2. Test for spatial autocorrelation before fitting
-log_oe = ...  # log(observed / expected) per sector, shape (N,)
+# 2. Synthetic territory data — 100 sectors, true claim rate ~7%.
+#    Replace with your actual observed claims and earned exposure per sector.
+rng = np.random.default_rng(42)
+exposure = rng.uniform(200, 2_000, size=N)          # policy-years per sector
+true_log_rate = rng.normal(-2.66, 0.35, size=N)     # spatial variation around 7%
+claims = rng.poisson(np.exp(true_log_rate) * exposure)
+
+# 3. Test for spatial autocorrelation before fitting.
+#    Run BYM2 only when Moran's I is significant — otherwise simpler
+#    credibility weighting suffices and MCMC runtime is wasted.
+log_oe = np.log((claims / exposure) / np.mean(claims / exposure) + 1e-8)
 test = moran_i(log_oe, adj, n_permutations=999)
 print(test.interpretation)
 
-# 3. Fit BYM2 model
+# 4. Fit BYM2 model (requires PyMC — uv add pymc)
 model = BYM2Model(adjacency=adj, draws=1000, chains=4)
 result = model.fit(
     claims=claims,      # np.ndarray, shape (N,)
-    exposure=exposure,  # np.ndarray, shape (N,)
+    exposure=exposure,  # np.ndarray, shape (N,) — earned policy-years
 )
 
-# 4. Check convergence
+# 5. Check convergence
 diag = result.diagnostics()
 print(f"Max R-hat: {diag.convergence.max_rhat:.3f}")    # want < 1.01
 print(f"Min ESS:   {diag.convergence.min_ess_bulk:.0f}") # want > 400
 
-# 5. Extract relativities
+# 6. Extract territory relativities ready for use as GLM offsets
 rels = result.territory_relativities(credibility_interval=0.95)
 # area | relativity | lower | upper | ln_offset
-# Use ln_offset as a fixed offset in your downstream GLM
+# Pass ln_offset as a fixed offset in your downstream Poisson GLM
 ```
 
 ## Spatial Conformal Prediction
@@ -93,6 +106,25 @@ The spatially weighted conformal predictor wraps your existing fitted model and 
 
 ```python
 from insurance_spatial.conformal import SpatialConformalPredictor, SpatialCoverageReport
+
+
+import numpy as np
+import polars as pl
+from sklearn.dummy import DummyRegressor
+
+# Synthetic UK motor data: 2,000 calibration + 500 test policies with lat/lon
+# (UK mainland bounding box: lat 50–58, lon -5–2)
+rng = np.random.default_rng(0)
+n_cal, n_test = 2_000, 500
+lat_cal = rng.uniform(50.5, 57.5, size=n_cal)
+lon_cal = rng.uniform(-4.5, 1.5, size=n_cal)
+lat_test = rng.uniform(50.5, 57.5, size=n_test)
+lon_test = rng.uniform(-4.5, 1.5, size=n_test)
+X_cal = rng.standard_normal((n_cal, 5))   # five rating factors
+X_test = rng.standard_normal((n_test, 5))
+y_cal = rng.gamma(1.5, scale=800, size=n_cal)   # claim severity
+# Fit a simple placeholder model (replace with your real CatBoost/LightGBM)
+fitted_lgbm = DummyRegressor(strategy='mean').fit(X_cal, y_cal)
 
 # Wrap your fitted GBM or GLM
 scp = SpatialConformalPredictor(
@@ -117,11 +149,14 @@ print(intervals.lower[:5], intervals.upper[:5])
 
 # Diagnose spatial coverage quality
 report = SpatialCoverageReport(scp)
+# Reuse test set as validation; replace with a separate validation split in production
+X_val, y_val = X_test, fitted_lgbm.predict(X_test)
+lat_val, lon_val = lat_test, lon_test
 result = report.evaluate(X_val, y_val, lat=lat_val, lon=lon_val)
 print(f"MACG: {result.macg:.4f}")  # lower = more spatially uniform coverage
 
 # FCA Consumer Duty table
-table = report.fca_consumer_duty_table(region_labels=county_labels)
+table = report.fca_consumer_duty_table(region_labels=None)  # pass a list of region names if available
 print(table.filter(pl.col('flag') == 'REVIEW'))
 ```
 
