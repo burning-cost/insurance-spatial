@@ -150,7 +150,8 @@ print(intervals.lower[:5], intervals.upper[:5])
 # Diagnose spatial coverage quality
 report = SpatialCoverageReport(scp)
 # Reuse test set as validation; replace with a separate validation split in production
-X_val, y_val = X_test, fitted_lgbm.predict(X_test)
+y_test = rng.gamma(1.5, scale=800, size=n_test)   # actual observed values for coverage check
+X_val, y_val = X_test, y_test
 lat_val, lon_val = lat_test, lon_test
 result = report.evaluate(X_val, y_val, lat=lat_val, lon=lon_val)
 print(f"MACG: {result.macg:.4f}")  # lower = more spatially uniform coverage
