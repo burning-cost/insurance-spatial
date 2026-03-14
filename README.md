@@ -287,7 +287,7 @@ The Moran's I comparison is the diagnostic that matters here. Flat banding leave
 | Library | Why it's relevant |
 |---------|------------------|
 | [insurance-multilevel](https://github.com/burning-cost/insurance-multilevel) | Broker and scheme random effects — the same credibility-weighting logic applied to group factors instead of territory |
-| [credibility](https://github.com/burning-cost/credibility) | Bühlmann-Straub closed-form credibility — simpler alternative when spatial correlation is not the primary concern |
+| [insurance-credibility](https://github.com/burning-cost/insurance-credibility) | Bühlmann-Straub closed-form credibility — simpler alternative when spatial correlation is not the primary concern |
 | [shap-relativities](https://github.com/burning-cost/shap-relativities) | Extract the base model's implicit territory effect before passing O/E ratios to BYM2 |
 | [insurance-causal](https://github.com/burning-cost/insurance-causal) | Test whether a postcode factor is a genuine risk driver or a proxy for a protected characteristic |
 | [insurance-demand](https://github.com/burning-cost/insurance-demand) | Conversion and retention modelling — territory is a key feature in demand models |
