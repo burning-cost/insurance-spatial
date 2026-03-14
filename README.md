@@ -303,6 +303,14 @@ The Moran's I comparison is the diagnostic that matters here. Flat banding leave
 - Hjort, N. L., Jullum, M., & Loland, A. (2025). Uncertainty quantification in automated valuation models with spatially weighted conformal prediction. *IJDSA (Springer)*. doi:10.1007/s41060-025-00862-4
 - Tibshirani, R. J., Barber, R. F., Candes, E. J., & Ramdas, A. (2019). Conformal prediction under covariate shift. *NeurIPS 2019*.
 
+
+## Related Libraries
+
+| Library | What it does |
+|---------|-------------|
+| [bayesian-pricing](https://github.com/burning-cost/bayesian-pricing) | Hierarchical Bayesian models for thin rating cells — the same partial-pooling logic applied to non-geographic grouping factors |
+| [insurance-glm-tools](https://github.com/burning-cost/insurance-glm-tools) | GLM tooling including R2VF factor merging — use to band territory factors after BYM2 produces the relativities |
+
 ## Licence
 
 MIT
