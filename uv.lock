@@ -933,24 +933,30 @@ wheels = [
 
 [[package]]
 name = "insurance-spatial"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "arviz", version = "0.23.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "arviz", version = "1.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "matplotlib" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pgeocode" },
     { name = "polars" },
-    { name = "pymc", version = "5.25.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "pymc", version = "5.28.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "pytensor", version = "2.31.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "pytensor", version = "2.38.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "scikit-learn", version = "1.7.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "scikit-learn", version = "1.8.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 
 [package.optional-dependencies]
 dev = [
+    { name = "lightgbm" },
+    { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "pandas", version = "3.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pyarrow" },
+    { name = "pymc", version = "5.25.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "pymc", version = "5.28.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "pytest" },
     { name = "pytest-cov" },
 ]
@@ -965,6 +971,12 @@ geo = [
     { name = "libpysal", version = "4.13.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "libpysal", version = "4.14.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "shapely" },
+]
+mcmc = [
+    { name = "pymc", version = "5.25.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "pymc", version = "5.28.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pytensor", version = "2.31.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "pytensor", version = "2.38.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 nutpie = [
     { name = "nutpie", version = "0.15.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -983,18 +995,25 @@ requires-dist = [
     { name = "geopandas", marker = "extra == 'plots'", specifier = ">=0.14" },
     { name = "libpysal", marker = "extra == 'diagnostics'", specifier = ">=4.9" },
     { name = "libpysal", marker = "extra == 'geo'", specifier = ">=4.9" },
+    { name = "lightgbm", marker = "extra == 'dev'", specifier = ">=4.0" },
+    { name = "matplotlib", specifier = ">=3.7" },
     { name = "matplotlib", marker = "extra == 'plots'", specifier = ">=3.7" },
     { name = "numpy", specifier = ">=1.25" },
     { name = "nutpie", marker = "extra == 'nutpie'", specifier = ">=0.9" },
-    { name = "polars", specifier = ">=0.20" },
-    { name = "pymc", specifier = ">=5.10" },
-    { name = "pytensor", specifier = ">=2.18" },
+    { name = "pandas", marker = "extra == 'dev'", specifier = ">=2.0" },
+    { name = "pgeocode", specifier = ">=0.4" },
+    { name = "polars", specifier = ">=1.0" },
+    { name = "pyarrow", marker = "extra == 'dev'", specifier = ">=12.0" },
+    { name = "pymc", marker = "extra == 'dev'", specifier = ">=5.0" },
+    { name = "pymc", marker = "extra == 'mcmc'", specifier = ">=5.10" },
+    { name = "pytensor", marker = "extra == 'mcmc'", specifier = ">=2.18" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
+    { name = "scikit-learn", specifier = ">=1.3" },
     { name = "scipy", specifier = ">=1.11" },
     { name = "shapely", marker = "extra == 'geo'", specifier = ">=2.0" },
 ]
-provides-extras = ["geo", "diagnostics", "plots", "nutpie", "dev"]
+provides-extras = ["mcmc", "geo", "diagnostics", "plots", "nutpie", "dev"]
 
 [[package]]
 name = "jinja2"
@@ -1180,6 +1199,25 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/da/aa/a44cd823fcc07df56282783898a3ad62f908ea6b6ea3d9bbdb30be71944f/libpysal-4.14.1.tar.gz", hash = "sha256:84a0a832178e57b54f7da35f1c3385c1eaf99016ec8ff819add3b89d36aaff1c", size = 6916386, upload-time = "2026-01-09T18:11:37.005Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0b/d0/a1b09cdea5211f8913406c0560a178fdea6ccbaea4511bbc248e9205f977/libpysal-4.14.1-py3-none-any.whl", hash = "sha256:c2a7b2ea16978ed4c32c0898c0b352ddefd9ae3ea70adbab6fbeb3f21af63963", size = 2512081, upload-time = "2026-01-09T18:11:35.601Z" },
+]
+
+[[package]]
+name = "lightgbm"
+version = "4.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/68/0b/a2e9f5c5da7ef047cc60cef37f86185088845e8433e54d2e7ed439cce8a3/lightgbm-4.6.0.tar.gz", hash = "sha256:cb1c59720eb569389c0ba74d14f52351b573af489f230032a1c9f314f8bab7fe", size = 1703705, upload-time = "2025-02-15T04:03:03.111Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f2/75/cffc9962cca296bc5536896b7e65b4a7cdeb8db208e71b9c0133c08f8f7e/lightgbm-4.6.0-py3-none-macosx_10_15_x86_64.whl", hash = "sha256:b7a393de8a334d5c8e490df91270f0763f83f959574d504c7ccb9eee4aef70ed", size = 2010151, upload-time = "2025-02-15T04:02:50.961Z" },
+    { url = "https://files.pythonhosted.org/packages/21/1b/550ee378512b78847930f5d74228ca1fdba2a7fbdeaac9aeccc085b0e257/lightgbm-4.6.0-py3-none-macosx_12_0_arm64.whl", hash = "sha256:2dafd98d4e02b844ceb0b61450a660681076b1ea6c7adb8c566dfd66832aafad", size = 1592172, upload-time = "2025-02-15T04:02:53.937Z" },
+    { url = "https://files.pythonhosted.org/packages/64/41/4fbde2c3d29e25ee7c41d87df2f2e5eda65b431ee154d4d462c31041846c/lightgbm-4.6.0-py3-none-manylinux2014_aarch64.whl", hash = "sha256:4d68712bbd2b57a0b14390cbf9376c1d5ed773fa2e71e099cac588703b590336", size = 3454567, upload-time = "2025-02-15T04:02:56.443Z" },
+    { url = "https://files.pythonhosted.org/packages/42/86/dabda8fbcb1b00bcfb0003c3776e8ade1aa7b413dff0a2c08f457dace22f/lightgbm-4.6.0-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:cb19b5afea55b5b61cbb2131095f50538bd608a00655f23ad5d25ae3e3bf1c8d", size = 3569831, upload-time = "2025-02-15T04:02:58.925Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/23/f8b28ca248bb629b9e08f877dd2965d1994e1674a03d67cd10c5246da248/lightgbm-4.6.0-py3-none-win_amd64.whl", hash = "sha256:37089ee95664b6550a7189d887dbf098e3eadab03537e411f52c63c121e3ba4b", size = 1451509, upload-time = "2025-02-15T04:03:01.515Z" },
 ]
 
 [[package]]
@@ -1928,6 +1966,22 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/6d/02/c6e04b694ffd68568297abd03588b6d30295265176a5c01b7459d3bc35a3/pandas-3.0.1-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:15860b1fdb1973fffade772fdb931ccf9b2f400a3f5665aef94a00445d7d8dd5", size = 11810974, upload-time = "2026-02-17T22:20:08.946Z" },
     { url = "https://files.pythonhosted.org/packages/89/41/d7dfb63d2407f12055215070c42fc6ac41b66e90a2946cdc5e759058398b/pandas-3.0.1-cp314-cp314t-win_amd64.whl", hash = "sha256:44f1364411d5670efa692b146c748f4ed013df91ee91e9bec5677fb1fd58b937", size = 10884622, upload-time = "2026-02-17T22:20:11.711Z" },
     { url = "https://files.pythonhosted.org/packages/68/b0/34937815889fa982613775e4b97fddd13250f11012d769949c5465af2150/pandas-3.0.1-cp314-cp314t-win_arm64.whl", hash = "sha256:108dd1790337a494aa80e38def654ca3f0968cf4f362c85f44c15e471667102d", size = 9452085, upload-time = "2026-02-17T22:20:14.331Z" },
+]
+
+[[package]]
+name = "pgeocode"
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "pandas", version = "3.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/91/27/0de1f3890a4b8c1a7ca0bd913251c1f414bf49d8d5d85482a8b95ba6c738/pgeocode-0.5.0.tar.gz", hash = "sha256:37d6caf74e9f2b1e69762811953df5b43fe7f1806833c83bf85a60dd784dff9e", size = 10473, upload-time = "2024-04-13T06:46:07.06Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/26/62/ff5ac22710794b01a6021fb681189f43e8bff224e100cb590ced4c545f7b/pgeocode-0.5.0-py3-none-any.whl", hash = "sha256:de24a5997524ef557a29a1b22443cc1bf5d02c098e0c7a8dd9ea9caf01a6a72a", size = 9772, upload-time = "2024-04-13T06:46:05.157Z" },
 ]
 
 [[package]]
