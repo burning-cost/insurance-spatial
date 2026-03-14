@@ -15,7 +15,6 @@ from insurance_spatial.adjacency import AdjacencyMatrix, build_grid_adjacency
 from insurance_spatial.models import BYM2Model, BYM2Result
 from insurance_spatial.diagnostics import MoranI, convergence_summary
 from insurance_spatial.relativities import extract_relativities
-from insurance_spatial import conformal  # noqa: F401 — expose sub-package
 
 __all__ = [
     "AdjacencyMatrix",
@@ -29,4 +28,11 @@ __all__ = [
     "__version__",
 ]
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
+
+
+def __getattr__(name: str):
+    if name == "conformal":
+        from insurance_spatial import conformal as _conformal
+        return _conformal
+    raise AttributeError(f"module 'insurance_spatial' has no attribute {name!r}")

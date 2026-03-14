@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "insurance-spatial"
-version = "0.2.0"
+version = "0.2.1"
 description = "BYM2 spatial territory ratemaking and conformal prediction intervals for UK personal lines insurance"
 readme = "README.md"
 license = { file = "LICENSE" }
