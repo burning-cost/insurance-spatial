@@ -283,6 +283,11 @@ The Moran's I comparison is the diagnostic that matters here. Flat banding leave
 **When NOT to use:** When spatial autocorrelation is not present (test with Moran's I before fitting — the library includes `moran_i()`), or when the rho posterior is near zero (meaning the data do not support spatial smoothing and simpler credibility weighting suffices). The 3–8 minute MCMC runtime per territory refresh is acceptable for monthly or quarterly batch cycles but not for real-time use.
 
 
+
+## Databricks Notebook
+
+A ready-to-run Databricks notebook benchmarking this library against standard approaches is available in [burning-cost-examples](https://github.com/burning-cost/burning-cost-examples/blob/main/notebooks/spatial_territory_ratemaking.py).
+
 ## Related libraries
 
 | Library | Why it's relevant |
