@@ -82,6 +82,8 @@ dev = [
 [project.urls]
 Repository = "https://github.com/burning-cost/insurance-spatial"
 Issues = "https://github.com/burning-cost/insurance-spatial/issues"
+Homepage = "https://github.com/burning-cost/insurance-spatial"
+Documentation = "https://github.com/burning-cost/insurance-spatial#readme"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/insurance_spatial"]
