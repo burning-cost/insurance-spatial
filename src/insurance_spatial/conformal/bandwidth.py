@@ -101,16 +101,31 @@ class BandwidthSelector:
         self, lat: np.ndarray, lon: np.ndarray
     ) -> np.ndarray:
         """
-        Assign fold labels via K-means on (lat, lon).
+        Assign fold labels via K-means on isotropic projected coordinates.
 
         Using K-means on coordinates gives spatially contiguous folds,
         preventing data leakage across geographically proximate observations.
+
+        At UK latitudes (~50-60N), raw lon coordinates are compressed relative
+        to lat: one degree of longitude is 60-70 km while one degree of latitude
+        is ~111 km.  Clustering on (lat, lon) directly creates taller-than-wide
+        elliptical folds, which undermines the spatial blocking rationale.
+
+        P1 fix: scale longitude by cos(mean_lat) before clustering.  This makes
+        the Euclidean distance in (lat, lon_scaled) space isotropic — one unit
+        represents approximately equal real-world distance in both directions.
 
         Returns
         -------
         np.ndarray of int, shape (n,), values in [0, cv).
         """
-        coords = np.column_stack([lat, lon])
+        lat = np.asarray(lat, dtype=float)
+        lon = np.asarray(lon, dtype=float)
+        # Isotropic projection: scale lon so that Euclidean distances approximate
+        # real-world distances equally in both dimensions.
+        mean_lat_rad = np.deg2rad(lat.mean())
+        lon_scaled = lon * np.cos(mean_lat_rad)
+        coords = np.column_stack([lat, lon_scaled])
         km = KMeans(
             n_clusters=self.cv,
             n_init=10,
@@ -138,8 +153,9 @@ class BandwidthSelector:
         """
         Weighted quantile using the Tibshirani (2019) framework.
 
-        Adds an extra 'infinity' point with weight 1/(n+1) for finite-sample
-        validity. The (1-alpha) quantile of the augmented weighted distribution.
+        Adds an extra 'infinity' point with weight 1.0 (matching kernel(0) = 1
+        for Gaussian kernel at zero distance) for finite-sample validity.
+        The (1-alpha) quantile of the augmented weighted distribution.
 
         Parameters
         ----------
@@ -152,8 +168,7 @@ class BandwidthSelector:
         float
         """
         n = len(scores)
-        # Augment: add infinity with weight proportional to 1
-        # Normalise existing weights so they sum to n/(n+1), infinity gets 1/(n+1)
+        # Augment: add infinity with weight 1.0 (Gaussian kernel at zero distance)
         w_aug = np.append(weights, 1.0)
         s_aug = np.append(scores, np.inf)
 
@@ -351,6 +366,9 @@ class BandwidthSelector:
         -------
         BandwidthCVResult
             The result has optimal_km set to the widened bandwidth if needed.
+            When widened, optimal_km is updated in-place on the returned object.
+            Note: cv_scores in the result correspond to the original CV run and
+            do not reflect the widened bandwidth's CV score (which was not computed).
         """
         result = self.select(scores, lat, lon, alpha)
 
@@ -363,7 +381,10 @@ class BandwidthSelector:
         min_n_eff = float(np.min(n_eff_per_test))
 
         if min_n_eff < self.n_eff_min:
-            # Find narrower candidate with sufficient n_eff
+            # Find the widest candidate with sufficient n_eff at all test points.
+            # Sorts in descending order (widest first) so we return the first
+            # that satisfies the floor — i.e. the widest adequate bandwidth,
+            # which is the most conservative choice consistent with the constraint.
             for candidate_bw in sorted(self.candidates_km, reverse=True):
                 w_mat = gaussian_weights(lat, lon, test_lat, test_lon, candidate_bw)
                 n_eff_vals = np.array([

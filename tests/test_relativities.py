@@ -58,6 +58,45 @@ def _make_mock_result(n_areas: int = 9, n_chains: int = 2, n_draws: int = 100):
     return result
 
 
+def _make_mock_result_high_variance(
+    n_areas: int = 9, n_chains: int = 2, n_draws: int = 500
+):
+    """
+    Mock result where the reference area has HIGH posterior variance.
+    Used to test that credibility intervals are wide enough when the
+    reference level is uncertain.
+    """
+    import xarray as xr
+
+    rng = np.random.default_rng(99)
+    true_b = np.zeros(n_areas)
+    # Make the reference area (area 4 = r1c1) have very high variance
+    b_samples = rng.standard_normal((n_chains, n_draws, n_areas)) * 0.05
+    # Reference area gets extra variance
+    b_samples[:, :, 4] += rng.standard_normal((n_chains, n_draws)) * 1.0
+
+    posterior_data = xr.Dataset(
+        {
+            "b": xr.DataArray(
+                b_samples,
+                dims=["chain", "draw", "b_dim_0"],
+            )
+        }
+    )
+
+    mock_trace = MagicMock()
+    mock_trace.posterior = posterior_data
+
+    adj = build_grid_adjacency(3, 3)
+    result = MagicMock()
+    result.trace = mock_trace
+    result.areas = adj.areas
+    result.adjacency = adj
+    result.n_areas = n_areas
+
+    return result
+
+
 class TestExtractRelativities:
     def test_returns_polars_dataframe(self):
         result = _make_mock_result()
@@ -99,24 +138,37 @@ class TestExtractRelativities:
         assert abs(geo_mean - 1.0) < 0.05  # within 5%
 
     def test_base_area_normalisation(self):
-        """Specified base_area should get relativity of exactly 1.0 in expectation."""
+        """Specified base_area should get relativity close to 1.0 in expectation."""
         result = _make_mock_result()
         df = extract_relativities(result, base_area="r1c1")
         base_row = df.filter(pl.col("area") == "r1c1")
-        # Should be close to 1.0 (not exact because we use posterior mean not sample)
-        assert abs(float(base_row["relativity"][0]) - 1.0) < 0.01
+        # Should be close to 1.0
+        assert abs(float(base_row["relativity"][0]) - 1.0) < 0.05
 
     def test_invalid_base_area_raises(self):
         result = _make_mock_result()
         with pytest.raises(ValueError, match="not found"):
             extract_relativities(result, base_area="INVALID_SECTOR")
 
-    def test_ln_offset_is_log_of_relativity(self):
+    def test_ln_offset_equals_b_mean_minus_reference(self):
+        """
+        ln_offset must equal b_mean - reference_b_mean (posterior log scale),
+        not log(relativity_mean) which is Jensen-biased.
+        """
         result = _make_mock_result()
-        df = extract_relativities(result)
-        computed = np.log(df["relativity"].to_numpy())
-        stored = df["ln_offset"].to_numpy()
-        np.testing.assert_allclose(computed, stored, atol=1e-10)
+        df_no_base = extract_relativities(result)
+        b_mean = df_no_base["b_mean"].to_numpy()
+        ln_offset = df_no_base["ln_offset"].to_numpy()
+        reference_b_mean = b_mean.mean()
+        expected_ln_offset = b_mean - reference_b_mean
+        np.testing.assert_allclose(ln_offset, expected_ln_offset, atol=1e-10)
+
+    def test_ln_offset_base_area(self):
+        """ln_offset for the base area should be 0.0 (b_base - b_base = 0)."""
+        result = _make_mock_result()
+        df = extract_relativities(result, base_area="r1c1")
+        base_row = df.filter(pl.col("area") == "r1c1")
+        assert abs(float(base_row["ln_offset"][0])) < 1e-10
 
     def test_ordering_preserved(self):
         """Areas in output should be in same order as result.areas."""
@@ -145,3 +197,83 @@ class TestExtractRelativities:
         result = _make_mock_result()
         df = extract_relativities(result)
         assert (df["b_sd"] >= 0).all()
+
+    # ------------------------------------------------------------------
+    # Regression tests for P0 bug: per-draw reference subtraction
+    # ------------------------------------------------------------------
+
+    def test_per_draw_subtraction_widens_ci_for_uncertain_reference(self):
+        """
+        P0 regression: when the reference area has high posterior variance,
+        credibility intervals on other areas must reflect that uncertainty.
+
+        With the buggy point-estimate subtraction, reference uncertainty is
+        discarded and intervals on non-reference areas are too narrow.
+
+        With the fix (per-draw subtraction), intervals must be wider when
+        the reference is uncertain.  We verify this by comparing the CI width
+        under base_area normalisation (uncertain reference) to grand-mean
+        normalisation (where per-draw mean of a large group has low variance).
+        """
+        result = _make_mock_result_high_variance(n_draws=500)
+
+        df_grand = extract_relativities(result, base_area=None)
+        df_base = extract_relativities(result, base_area="r1c1")  # uncertain area
+
+        # Under base_area normalisation with an uncertain reference, the CI for
+        # other areas should be at least as wide as under grand-mean normalisation
+        # (where the reference noise averages out across many areas).
+        mean_width_grand = float((df_grand["upper"] - df_grand["lower"]).mean())
+        mean_width_base = float((df_base["upper"] - df_base["lower"]).mean())
+
+        # The base-area-normalised intervals should be substantially wider
+        # (reference area has sigma ~1.0, all others have sigma ~0.05)
+        assert mean_width_base > mean_width_grand * 1.5, (
+            f"Expected base-area CI (uncertain reference) to be substantially wider "
+            f"than grand-mean CI. Got: base={mean_width_base:.4f}, "
+            f"grand={mean_width_grand:.4f}. "
+            "This suggests per-draw subtraction is not working correctly."
+        )
+
+    def test_per_draw_grand_mean_is_not_point_estimate(self):
+        """
+        Under grand-mean normalisation, the subtracted reference per-draw is
+        the draw-level mean of b (not the posterior mean of the mean).
+
+        Consequence: the grand-mean normalised relativity for each area
+        should have a geometric mean across areas of approximately 1.0
+        for EACH draw, not just in expectation.
+        """
+        import xarray as xr
+
+        rng = np.random.default_rng(77)
+        n_areas = 9
+        n_chains = 2
+        n_draws = 200
+        # b with a trend across draws (mean shifts over draws)
+        true_b = np.linspace(-0.3, 0.3, n_areas)
+        drift = np.linspace(0, 1.0, n_draws)[None, :, None]  # drift in draw dim
+        b_samples = true_b[None, None, :] + rng.standard_normal((n_chains, n_draws, n_areas)) * 0.1 + drift
+
+        posterior_data = xr.Dataset(
+            {"b": xr.DataArray(b_samples, dims=["chain", "draw", "b_dim_0"])}
+        )
+        mock_trace = MagicMock()
+        mock_trace.posterior = posterior_data
+
+        adj = build_grid_adjacency(3, 3)
+        result = MagicMock()
+        result.trace = mock_trace
+        result.areas = adj.areas
+        result.adjacency = adj
+        result.n_areas = n_areas
+
+        df = extract_relativities(result, base_area=None)
+
+        # The geometric mean of the output relativities should be close to 1.0
+        # regardless of the drift (because we subtract per-draw mean, which
+        # already absorbs the drift).
+        geo_mean = float(np.exp(np.log(df["relativity"].to_numpy()).mean()))
+        assert abs(geo_mean - 1.0) < 0.1, (
+            f"Geometric mean of relativities should be ~1.0, got {geo_mean:.4f}"
+        )

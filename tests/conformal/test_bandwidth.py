@@ -57,6 +57,71 @@ class TestSpatialFolds:
         labels = sel._spatial_folds(lat, lon)
         assert len(set(labels)) == 5
 
+    # ------------------------------------------------------------------
+    # Regression tests for P1 bug: K-means on raw lat/lon anisotropy
+    # ------------------------------------------------------------------
+
+    def test_isotropic_folds_at_uk_latitudes(self):
+        """
+        P1 regression: _spatial_folds must produce approximately isotropic
+        fold shapes at UK latitudes.
+
+        If we generate a uniform grid of points and cluster them, the resulting
+        folds should have similar extents in lat and (cos-corrected) lon.
+        The old implementation used raw (lat, lon) causing taller-than-wide folds
+        because 1 degree of latitude != 1 degree of longitude at UK latitudes.
+
+        We test this by generating a square grid in km-equivalent space and
+        verifying that the per-fold bounding boxes have approximately equal
+        lat and lon extents (in corrected units).
+        """
+        # Generate a grid at ~55N (Scotland/northern England boundary)
+        mean_lat = 55.0
+        cos_lat = np.cos(np.deg2rad(mean_lat))
+
+        # 10x10 grid of points evenly spaced in real-world km
+        # 1 degree lat = 111 km, so 1 km = 1/111 degrees
+        # 1 km in lon = 1/(111 * cos_lat) degrees
+        n_per_side = 20
+        lat_grid = np.linspace(53.0, 57.0, n_per_side)  # ~4 degrees = ~440 km
+        # Equivalent span in lon given cos correction
+        lon_span = 4.0 / cos_lat
+        lon_grid = np.linspace(-2.0, -2.0 + lon_span, n_per_side)
+
+        lat_2d, lon_2d = np.meshgrid(lat_grid, lon_grid)
+        lat = lat_2d.ravel()
+        lon = lon_2d.ravel()
+
+        sel = BandwidthSelector(cv=4, random_state=0)
+        labels = sel._spatial_folds(lat, lon)
+
+        # For each fold, compute the extent in lat and in lon (corrected)
+        lat_extents = []
+        lon_extents_corrected = []
+        for fold in range(4):
+            mask = labels == fold
+            if mask.sum() < 2:
+                continue
+            lat_f = lat[mask]
+            lon_f = lon[mask]
+            lat_extents.append(lat_f.max() - lat_f.min())
+            # Correct lon by cos(mean_lat)
+            lon_extents_corrected.append((lon_f.max() - lon_f.min()) * cos_lat)
+
+        lat_extents = np.array(lat_extents)
+        lon_extents_corrected = np.array(lon_extents_corrected)
+
+        # Aspect ratio of folds: lat_extent / corrected_lon_extent should be ~1
+        # (isotropic folds). With the old bug it would be ~1/cos_lat ≈ 1.74 at 55N.
+        aspect_ratios = lat_extents / (lon_extents_corrected + 1e-6)
+        mean_aspect = float(np.mean(aspect_ratios))
+
+        assert 0.5 <= mean_aspect <= 2.0, (
+            f"Fold aspect ratio at UK latitudes should be ~1 (isotropic). "
+            f"Got mean aspect ratio = {mean_aspect:.2f}. "
+            "If this is ~1.74, the cos(lat) scaling fix is not applied."
+        )
+
 
 class TestKishNEff:
     def test_uniform_weights(self):

@@ -83,3 +83,50 @@ class TestMoranI:
         values = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9], dtype=float)
         result = moran_i(values, grid_3x3)
         assert isinstance(result.statistic, float)
+
+    # ------------------------------------------------------------------
+    # Regression tests for P0 bug: one-tailed p-value missed negative autocorrelation
+    # ------------------------------------------------------------------
+
+    def test_p_value_is_two_tailed(self, grid_5x5):
+        """
+        P0 regression: p-value must be two-tailed so that strongly negative
+        spatial autocorrelation is flagged as significant.
+
+        A checkerboard pattern on a 5×5 rook grid produces a strongly negative
+        Moran's I (adjacent cells always differ).  With the old one-tailed test
+        (perm_stats >= observed_I), p would be close to 1.0 for negative I,
+        making it appear non-significant.  The two-tailed test must give a low p.
+        """
+        # Checkerboard: alternating 0/1 by (row+col) parity — strong negative autocorr
+        values = np.array([(i // 5 + i % 5) % 2 for i in range(25)], dtype=float)
+        result = moran_i(values, grid_5x5, n_permutations=999)
+
+        assert result.statistic < 0, (
+            f"Expected negative Moran's I for checkerboard, got {result.statistic:.4f}"
+        )
+        # The p-value must be small (significant negative autocorrelation)
+        assert result.p_value < 0.05, (
+            f"Checkerboard should be significantly negatively autocorrelated "
+            f"(p={result.p_value:.4f}), but p >= 0.05. "
+            "This suggests the one-tailed bug is still present."
+        )
+        assert result.significant
+
+    def test_p_value_in_zero_one(self, grid_5x5):
+        """p-value must always be in [0, 1]."""
+        rng = np.random.default_rng(7)
+        for _ in range(5):
+            values = rng.standard_normal(25)
+            result = moran_i(values, grid_5x5, n_permutations=199)
+            assert 0.0 <= result.p_value <= 1.0
+
+    def test_two_tailed_symmetric_for_positive_autocorr(self, grid_5x5):
+        """
+        For strong positive autocorrelation, two-tailed p-value should still
+        be small (i.e. not degraded by the two-tailing).
+        """
+        values = np.array([float(i // 5) for i in range(25)])
+        result = moran_i(values, grid_5x5, n_permutations=999)
+        assert result.p_value < 0.05
+        assert result.significant

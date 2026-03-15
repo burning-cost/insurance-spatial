@@ -459,14 +459,30 @@ class SpatialConformalPredictor:
         """
         Weighted (1-alpha) quantile with Tibshirani (2019) augmentation.
 
-        Adds an extra point at +infinity with weight = (sum of actual weights)
-        divided by n_cal, providing finite-sample marginal coverage guarantee.
+        Adds an augmented point at +infinity representing a hypothetical
+        calibration point located at the test position.  Under the Gaussian
+        kernel, a point at distance zero from itself has weight exp(0) = 1.0,
+        so the augmented weight is 1.0.
+
+        This is the correct implementation per Tibshirani (2019) Theorem 1 for
+        spatially weighted conformal prediction.  The previous implementation
+        used sum(w)/n as the augmented weight, which approximates the average
+        calibration weight and is wrong when calibration weights are non-uniform
+        (i.e., almost always in the spatial setting).  For urban test points with
+        many nearby calibration points, sum(w)/n << 1.0, making the augmented
+        infinity point too light and under-protecting marginal coverage.
+
+        Note: bandwidth.py's _weighted_quantile already uses weight=1.0 (correct).
+        This method is now consistent with that implementation.
         """
         n = len(scores)
         w = np.asarray(weights, dtype=float)
 
-        # Augment with +inf point
-        w_aug = np.append(w, np.sum(w) / n if n > 0 else 1.0)
+        # P0 fix: augmented infinity point weight = 1.0, matching kernel(0) = exp(0) = 1
+        # for Gaussian kernel.  bandwidth.py correctly uses np.append(weights, 1.0);
+        # this was inconsistently using sum(w)/n, which is the average weight and wrong
+        # for non-uniform spatial weights.
+        w_aug = np.append(w, 1.0)
         s_aug = np.append(scores, np.inf)
 
         w_total = np.sum(w_aug)

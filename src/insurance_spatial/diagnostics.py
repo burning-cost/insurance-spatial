@@ -50,7 +50,9 @@ class MoranI:
         Expected value under the null hypothesis of no spatial autocorrelation.
         For N areas with row-standardised weights: E[I] = -1/(N-1).
     p_value :
-        Pseudo p-value from permutation test (more reliable than analytical approximation).
+        Two-tailed pseudo p-value from permutation test (more reliable than
+        analytical approximation).  Significant for both positive and negative
+        autocorrelation.
     z_score :
         Z-score from permutation distribution.
     n_permutations :
@@ -84,7 +86,7 @@ class ConvergenceSummary:
     min_ess_tail :
         Minimum tail ESS.  Should be > 400.
     converged :
-        True if max_rhat < 1.01 and min_ess_bulk > 400.
+        True if max_rhat < 1.01 and min_ess_bulk > 400 and min_ess_tail > 400.
     rhat_by_param :
         Polars DataFrame with R-hat per named parameter group.
     ess_by_param :
@@ -124,6 +126,12 @@ def moran_i(
 
     This is the pure-Python/numpy implementation that does not require esda.
     It computes the permutation-based p-value directly.
+
+    The p-value is two-tailed: it reflects the probability of observing a
+    statistic as extreme as the observed one in either direction under the
+    null hypothesis of spatial randomness.  This correctly flags both
+    significant positive autocorrelation (clustered) and significant negative
+    autocorrelation (dispersed / checkerboard).
 
     Parameters
     ----------
@@ -171,7 +179,12 @@ def moran_i(
     perm_mean = perm_stats.mean()
     perm_std = perm_stats.std()
     z_score = (observed_I - perm_mean) / perm_std if perm_std > 0 else 0.0
-    p_value = float(np.mean(perm_stats >= observed_I))
+
+    # P0 fix: two-tailed p-value so that significant negative autocorrelation
+    # (observed_I much smaller than permutation distribution) is correctly flagged.
+    # A one-tailed test using perm_stats >= observed_I would give p ~ 1.0 for
+    # strongly negative I, making the result look completely non-significant.
+    p_value = float(np.mean(np.abs(perm_stats - perm_mean) >= abs(observed_I - perm_mean)))
 
     significant = p_value < 0.05
     if significant and observed_I > 0:
@@ -272,7 +285,11 @@ def convergence_summary(result: "BYM2Result") -> ConvergenceSummary:
     if hasattr(trace, "sample_stats") and "diverging" in trace.sample_stats:
         n_divergences = int(trace.sample_stats["diverging"].values.sum())
 
-    converged = (max_rhat < 1.01) and (min_ess_bulk > 400)
+    # P1 fix: include tail ESS in the convergence criterion.
+    # Previously converged only checked bulk ESS, leaving models with poor
+    # tail sampling (inadequate exploration of tails, common with heavy-tailed
+    # posteriors) incorrectly flagged as converged.
+    converged = (max_rhat < 1.01) and (min_ess_bulk > 400) and (min_ess_tail > 400)
 
     return ConvergenceSummary(
         max_rhat=max_rhat,

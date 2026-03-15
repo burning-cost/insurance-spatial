@@ -271,3 +271,97 @@ class TestWeightedQuantile:
         zero_weights = np.zeros(len(scp.cal_scores_))
         q = scp._weighted_quantile(scp.cal_scores_, zero_weights, 0.10)
         assert np.isfinite(q) or q == np.inf
+
+    # ------------------------------------------------------------------
+    # Regression tests for P0 bug: augmented infinity weight should be 1.0
+    # ------------------------------------------------------------------
+
+    def test_augmented_weight_is_one_not_sum_over_n(self, dummy_model, cal_data):
+        """
+        P0 regression: the augmented +infinity point must receive weight 1.0,
+        not sum(w)/n.
+
+        For sparse weights (sum(w)/n << 1.0), the augmented infinity gets
+        relatively MORE weight in the correct implementation (weight=1.0) than
+        in the buggy version (weight=sum(w)/n ~ 0.0), so the correct version
+        returns a higher quantile (infinity is more dominant).
+
+        We use a large score set (400 calibration scores) with uniform weights
+        so the quantile is always finite, and then verify the augmented weight
+        formula explicitly.
+        """
+        scp = SpatialConformalPredictor(model=dummy_model, bandwidth_km=20.0)
+        scp.calibrate(
+            cal_data["X"], cal_data["y"],
+            lat=cal_data["lat"], lon=cal_data["lon"]
+        )
+        # Use actual calibration scores — 400 points guarantees a finite quantile
+        scores = scp.cal_scores_
+        n = len(scores)
+
+        # Sparse weights: sum(w)/n will be very small (0.001/n * n = 0.001)
+        w_sparse = np.full(n, 0.001)
+
+        q_correct = scp._weighted_quantile(scores, w_sparse, 0.10)
+
+        # Compute the buggy version manually: augmented weight = sum(w)/n
+        w_aug_buggy = np.append(w_sparse, w_sparse.sum() / n)
+        s_aug = np.append(scores, np.inf)
+        w_total_buggy = w_aug_buggy.sum()
+        w_norm_buggy = w_aug_buggy / w_total_buggy
+        sort_idx = np.argsort(s_aug)
+        s_sorted = s_aug[sort_idx]
+        w_sorted = w_norm_buggy[sort_idx]
+        cdf_buggy = np.cumsum(w_sorted)
+        idx = np.searchsorted(cdf_buggy, 0.90)
+        q_buggy = float(s_sorted[min(idx, len(s_sorted) - 1)])
+
+        # With weight=1.0, the augmented infinity point has weight 1.0 out of
+        # total = n*0.001 + 1.0 = ~1.4 for n=400, so ~71% from inf.
+        # With sum(w)/n = 0.001, augmented infinity has weight 0.001 out of ~0.401,
+        # so only ~0.25% from inf.
+        # The correct version should return a MUCH higher quantile (likely inf)
+        # while the buggy version returns a finite score.
+        assert q_correct >= q_buggy, (
+            f"With sparse weights, weight=1.0 augmentation (correct) should give "
+            f"q >= sum(w)/n augmentation (buggy). "
+            f"Got correct={q_correct}, buggy={q_buggy}."
+        )
+
+    def test_bandwidth_py_and_predictor_py_consistent(self, dummy_model, cal_data):
+        """
+        P0 consistency check: bandwidth.py and predictor.py must use the same
+        augmented weight for the infinity point (both use weight=1.0).
+
+        We call both with the actual calibration scores and uniform weights
+        so the result is finite, and verify they match exactly.
+        """
+        from insurance_spatial.conformal.bandwidth import BandwidthSelector
+
+        scp = SpatialConformalPredictor(model=dummy_model, bandwidth_km=20.0)
+        scp.calibrate(
+            cal_data["X"], cal_data["y"],
+            lat=cal_data["lat"], lon=cal_data["lon"]
+        )
+        sel = BandwidthSelector()
+
+        # Use the actual calibration scores with uniform weights
+        # and alpha=0.50 (median) so the result is always finite
+        scores = scp.cal_scores_
+        weights = np.ones(len(scores))
+        alpha = 0.50
+
+        q_predictor = scp._weighted_quantile(scores, weights, alpha)
+        q_bandwidth = sel._weighted_quantile(scores, weights, alpha)
+
+        # Both should return a finite value
+        assert np.isfinite(q_predictor), f"predictor returned non-finite: {q_predictor}"
+        assert np.isfinite(q_bandwidth), f"bandwidth returned non-finite: {q_bandwidth}"
+
+        # Both must return the same value — they use the same algorithm
+        assert abs(q_predictor - q_bandwidth) < 1e-10, (
+            f"predictor._weighted_quantile ({q_predictor}) and "
+            f"bandwidth._weighted_quantile ({q_bandwidth}) must return the same "
+            f"result for identical inputs. They are now inconsistent — "
+            f"check that both use weight=1.0 for the augmented infinity point."
+        )

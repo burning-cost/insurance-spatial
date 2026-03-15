@@ -8,9 +8,16 @@ directly into an existing GLM as a log-scale offset column:
     ln_offset = ln(relativity) = b_i - reference_b
 
 where reference_b is either:
-  - the grand mean of b across all areas (default), giving a mean-centred set
-    that multiplies to 1 in geometric terms, or
-  - the posterior mean of b for a specified base area (that area gets 1.0).
+  - the per-draw grand mean of b across all areas (default), giving a mean-centred
+    set that multiplies to 1 in geometric terms, or
+  - the per-draw b value for a specified base area (that area gets exactly 1.0
+    for each posterior draw before the expectation is taken).
+
+The per-draw subtraction is the key correctness requirement: subtracting a
+point estimate (posterior mean) of the reference level instead of the per-draw
+value underestimates credibility interval width, because it ignores uncertainty
+in the reference level itself.  For areas with sparse data, this can make
+intervals look materially tighter than they should be.
 
 The output DataFrame is Polars and includes posterior mean, standard deviation,
 and a symmetric credibility interval on the log scale and multiplicative scale.
@@ -40,8 +47,8 @@ def extract_relativities(
     result :
         Fitted BYM2Result object containing the MCMC trace.
     base_area :
-        Area identifier to use as the reference (relativity = 1.0).
-        If None, normalise to the geometric mean (log-scale grand mean = 0).
+        Area identifier to use as the reference (relativity = 1.0 in expectation).
+        If None, normalise to the per-draw geometric mean (log-scale grand mean = 0).
     credibility_interval :
         Width of the symmetric posterior interval.  0.95 gives 2.5%–97.5%.
 
@@ -51,16 +58,13 @@ def extract_relativities(
         area          str
         b_mean        float  posterior mean of b_i (log scale)
         b_sd          float  posterior SD of b_i (log scale)
-        relativity    float  exp(b_i - reference_b), multiplicative factor
+        relativity    float  posterior mean of exp(b_i - reference_b_draw),
+                             propagating uncertainty in the reference level
         lower         float  lower credibility bound on relativity
         upper         float  upper credibility bound on relativity
-        ln_offset     float  = ln(relativity), ready to use as GLM log-offset
+        ln_offset     float  b_mean - reference_b_mean, ready to use as GLM
+                             log-offset (consistent with posterior mean on log scale)
     """
-    try:
-        import arviz as az
-    except ImportError as exc:
-        raise ImportError("extract_relativities requires arviz. uv add arviz") from exc
-
     trace = result.trace
 
     # Pull posterior samples of b: shape (chains, draws, N)
@@ -73,7 +77,12 @@ def extract_relativities(
     b_mean = b_flat.mean(axis=0)  # (N,)
     b_sd = b_flat.std(axis=0)     # (N,)
 
-    # Determine reference level
+    # P0 fix: use per-draw reference level rather than a point estimate.
+    # Subtracting the posterior mean of the reference area fixes it at its
+    # expected value and ignores its uncertainty — credibility intervals on
+    # all other relativities then don't account for uncertainty in the
+    # denominator.  The correct approach subtracts the reference's draw-level
+    # b from each draw, propagating that uncertainty into every interval.
     if base_area is not None:
         if base_area not in result.areas:
             raise ValueError(
@@ -81,14 +90,17 @@ def extract_relativities(
                 f"First few areas: {result.areas[:5]}"
             )
         ref_idx = result.areas.index(base_area)
-        # Reference is the posterior mean of the base area's b
-        reference_b = b_mean[ref_idx]
+        # Per-draw subtraction: shape (S, 1) broadcasts over (S, N)
+        ref_b_draws = b_flat[:, ref_idx : ref_idx + 1]  # (S, 1)
+        b_adjusted = b_flat - ref_b_draws                # (S, N)
+        # Scalar reference for ln_offset (log-scale point estimate)
+        reference_b_mean = b_mean[ref_idx]
     else:
-        # Grand mean normalisation (geometric mean of relativities = 1)
-        reference_b = b_mean.mean()
+        # Grand mean normalisation: subtract the per-draw mean across all areas
+        # so that each draw individually sums to zero on log scale.
+        b_adjusted = b_flat - b_flat.mean(axis=1, keepdims=True)  # (S, N)
+        reference_b_mean = b_mean.mean()
 
-    # Compute relativities on the full posterior sample (preserves uncertainty)
-    b_adjusted = b_flat - reference_b  # (S, N)
     rel_samples = np.exp(b_adjusted)   # (S, N)
 
     alpha = 1.0 - credibility_interval
@@ -98,7 +110,13 @@ def extract_relativities(
     relativity_mean = rel_samples.mean(axis=0)
     lower_ci = np.quantile(rel_samples, lower_q, axis=0)
     upper_ci = np.quantile(rel_samples, upper_q, axis=0)
-    ln_offset = np.log(relativity_mean)
+
+    # ln_offset: the log-scale relativity for direct use as a GLM offset.
+    # This is the posterior mean of b_i minus the posterior mean of the
+    # reference level.  We use the log-scale quantity (not log of the
+    # multiplicative relativity) to avoid Jensen's inequality bias —
+    # log(E[exp(X)]) > E[X] for non-degenerate X.
+    ln_offset = b_mean - reference_b_mean
 
     df = pl.DataFrame(
         {

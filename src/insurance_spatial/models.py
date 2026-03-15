@@ -8,7 +8,9 @@ We fit a Poisson frequency model with a BYM2 spatial random effect:
     y_i ~ Poisson(mu_i)
     log(mu_i) = log(E_i) + alpha + X_i @ beta + b_i
 
-    b_i = sigma * (sqrt(rho / s) * phi_i + sqrt(1 - rho) * theta_i)
+    b_i = sigma * (sqrt(rho) * phi*_i + sqrt(1 - rho) * theta_i)
+
+    where phi*_i = phi_i / sqrt(s)  (pre-scaled to unit marginal variance)
 
     phi ~ ICAR(W)          # structured spatial component
     theta ~ Normal(0, 1)   # unstructured (IID) component
@@ -20,11 +22,20 @@ We fit a Poisson frequency model with a BYM2 spatial random effect:
 Here:
   - E_i is exposure (policy-years) for area i, used as an offset
   - s is the BYM2 scaling factor (geometric mean of ICAR marginal variances)
-  - phi is scaled to unit variance by the scaling factor
+  - phi* = phi / sqrt(s) has unit marginal variance after scaling
   - rho is the proportion of variance attributable to spatial structure
 
 The rho parameter is directly interpretable: rho near 1 means the residual
 geographic variation is spatially smooth; rho near 0 means it is pure noise.
+
+Parameterisation note (Riebler et al. 2016)
+--------------------------------------------
+The critical step is to pre-scale phi by 1/sqrt(s) BEFORE applying the rho
+mixture weight.  This ensures that Var(phi*) = 1 = Var(theta), so rho is the
+true proportion of marginal variance from the spatial component.  Writing the
+formula as sqrt(rho/s) * phi (without pre-scaling) is algebraically equivalent
+for the point estimate of b, but rho loses its variance-proportion interpretation
+because the effective spatial weight depends on both rho and s together.
 
 Optional nutpie sampler
 -----------------------
@@ -252,11 +263,17 @@ class BYM2Model:
             phi = pm.ICAR("phi", W=W_dense, shape=N)
             theta = pm.Normal("theta", mu=0.0, sigma=1.0, shape=N)
 
-            # BYM2 combined spatial effect
+            # BYM2 combined spatial effect (Riebler et al. 2016, eq. 6)
+            # Pre-scale phi so it has unit marginal variance, THEN apply rho
+            # as a mixture weight.  This preserves rho's interpretation as the
+            # proportion of marginal variance attributable to spatial structure.
+            # Using sqrt(rho / s) * phi is algebraically equivalent for b but
+            # breaks the rho interpretation when scaling_factor != 1.
+            phi_scaled = phi / pt.sqrt(float(scaling_factor))
             b = pm.Deterministic(
                 "b",
                 sigma * (
-                    pt.sqrt(rho / scaling_factor) * phi
+                    pt.sqrt(rho) * phi_scaled
                     + pt.sqrt(1.0 - rho) * theta
                 ),
             )

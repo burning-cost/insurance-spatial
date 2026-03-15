@@ -141,12 +141,32 @@ def compute_bym2_scaling_factor(W: sparse.spmatrix) -> float:
     ----------
     W :
         N×N binary symmetric adjacency matrix (scipy sparse).
+        Must represent a connected graph (single component).
 
     Returns
     -------
     float
         Scaling factor s > 0.
+
+    Raises
+    ------
+    ValueError
+        If W has more than one connected component.  The ICAR scaling factor
+        is only defined for a connected graph.  Connect islands first by calling
+        fix_islands=True in from_geojson(), or handle components manually.
     """
+    # P0 fix: guard against disconnected graphs before eigendecomposition.
+    # A disconnected graph has multiple zero eigenvalues; the pseudoinverse
+    # would zero all of them, producing a scaling factor that is meaningless
+    # and would silently mis-scale the BYM2 parameterisation.
+    n_comp, _ = connected_components(W, directed=False)
+    if n_comp > 1:
+        raise ValueError(
+            f"W has {n_comp} connected components. "
+            "The ICAR scaling factor is only defined for a connected graph. "
+            "Call fix_islands=True in from_geojson(), or connect components manually."
+        )
+
     W_arr = sparse.csr_matrix(W, dtype=np.float64).toarray()
     N = W_arr.shape[0]
     d = W_arr.sum(axis=1)
@@ -298,17 +318,22 @@ def from_geojson(
 def _connect_islands(adj: AdjacencyMatrix, gdf) -> AdjacencyMatrix:  # type: ignore[no-untyped-def]
     """
     Connect disconnected components by linking island nodes to their nearest
-    node in the largest connected component.
+    node in the current main connected component (re-evaluated after each merge).
 
     Nearest is measured by Euclidean distance between polygon centroids.
+
+    The algorithm recomputes connected components after adding each island's
+    edges, so that a subsequent island can connect to a previously-isolated
+    component that has already been merged into the main component.  This
+    produces a more geographically coherent topology than the naive approach
+    of always connecting to the original main component.
+
+    After all islands are connected, an assertion verifies the result is
+    a single connected component.
     """
     n_comp, labels = connected_components(adj.W, directed=False)
     if n_comp == 1:
         return adj
-
-    # Find the largest component
-    counts = np.bincount(labels)
-    main_label = int(np.argmax(counts))
 
     centroids_x = gdf.geometry.centroid.x.values
     centroids_y = gdf.geometry.centroid.y.values
@@ -316,11 +341,20 @@ def _connect_islands(adj: AdjacencyMatrix, gdf) -> AdjacencyMatrix:  # type: ign
     W_lil = adj.W.tolil()
     n_islands_connected = 0
 
-    for comp_label in range(n_comp):
-        if comp_label == main_label:
-            continue
-        island_nodes = np.where(labels == comp_label)[0]
-        main_nodes = np.where(labels == main_label)[0]
+    # P1 fix: recompute component labels after each mutation so that
+    # subsequent islands can connect to a recently-merged component rather
+    # than always targeting the original main component.
+    current_n_comp, current_labels = n_comp, labels
+    while current_n_comp > 1:
+        # Find the largest component in the current graph
+        counts = np.bincount(current_labels)
+        main_label = int(np.argmax(counts))
+        main_nodes = np.where(current_labels == main_label)[0]
+
+        # Pick the first non-main component to merge
+        non_main_labels = [lbl for lbl in range(current_n_comp) if lbl != main_label]
+        comp_label = non_main_labels[0]
+        island_nodes = np.where(current_labels == comp_label)[0]
 
         for island_node in island_nodes:
             ix, iy = centroids_x[island_node], centroids_y[island_node]
@@ -332,11 +366,24 @@ def _connect_islands(adj: AdjacencyMatrix, gdf) -> AdjacencyMatrix:  # type: ign
             W_lil[nearest_main, island_node] = 1.0
             n_islands_connected += 1
 
+        # Recompute components with the updated graph for next iteration
+        W_current = W_lil.tocsr()
+        current_n_comp, current_labels = connected_components(W_current, directed=False)
+
+    W_new = W_lil.tocsr()
+
+    # Verify connectivity — this should always pass; if not, something is wrong
+    # with the centroid geometry
+    final_n_comp, _ = connected_components(W_new, directed=False)
+    assert final_n_comp == 1, (
+        f"_connect_islands failed to produce a connected graph: "
+        f"{final_n_comp} components remain after island connection."
+    )
+
     warnings.warn(
         f"Graph had {n_comp} connected components. "
         f"Connected {n_islands_connected} island nodes to nearest mainland node.",
         UserWarning,
         stacklevel=3,
     )
-    W_new = W_lil.tocsr()
     return AdjacencyMatrix(W=W_new, areas=adj.areas)

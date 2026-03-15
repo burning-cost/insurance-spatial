@@ -7,6 +7,7 @@ These tests run locally: no model fitting, no heavy computation.
 import numpy as np
 import pytest
 from scipy import sparse
+from scipy.sparse.csgraph import connected_components
 
 from insurance_spatial.adjacency import (
     AdjacencyMatrix,
@@ -147,3 +148,118 @@ class TestScalingFactor:
         adj_large = build_grid_adjacency(5, 5)
         # Scaling factors should differ (they depend on graph topology)
         assert abs(adj_small.scaling_factor - adj_large.scaling_factor) > 1e-6
+
+    # ------------------------------------------------------------------
+    # Regression tests for P0 bug: disconnected graph connectivity check
+    # ------------------------------------------------------------------
+
+    def test_disconnected_graph_raises_value_error(self):
+        """
+        P0 regression: compute_bym2_scaling_factor must raise ValueError for
+        a disconnected graph.  Previously it silently computed a meaningless
+        scaling factor with multiple zeroed eigenvalues.
+        """
+        # Build two isolated nodes (0--(nothing)--1) as a 2-node, 0-edge graph
+        W_disconnected = sparse.csr_matrix(np.array([[0., 0.], [0., 0.]]))
+        with pytest.raises(ValueError, match="connected component"):
+            compute_bym2_scaling_factor(W_disconnected)
+
+    def test_disconnected_graph_two_components_raises(self):
+        """
+        Two separate 2-node connected components, combined into one 4-node
+        disconnected graph, should raise.
+        """
+        # Component 1: nodes 0-1 connected; Component 2: nodes 2-3 connected
+        W = np.array([
+            [0, 1, 0, 0],
+            [1, 0, 0, 0],
+            [0, 0, 0, 1],
+            [0, 0, 1, 0],
+        ], dtype=float)
+        with pytest.raises(ValueError, match="2 connected component"):
+            compute_bym2_scaling_factor(sparse.csr_matrix(W))
+
+    def test_connected_graph_does_not_raise(self):
+        """
+        A connected graph must not raise — basic sanity after the connectivity check.
+        """
+        adj = build_grid_adjacency(3, 3)
+        # Should run without error and return a positive float
+        s = compute_bym2_scaling_factor(adj.W)
+        assert s > 0
+
+
+class TestConnectIslands:
+    """
+    Regression tests for P1 bug: _connect_islands stale label array.
+
+    We test via the AdjacencyMatrix.n_components() method after constructing
+    a synthetic disconnected adjacency and manually calling _connect_islands.
+    These tests do not require geopandas or libpysal.
+    """
+
+    def _make_disconnected_adj_with_gdf(self, n_nodes=6):
+        """
+        Build a synthetic disconnected AdjacencyMatrix and a minimal mock GDF
+        with geometry centroids, suitable for passing to _connect_islands.
+        """
+        from unittest.mock import MagicMock
+
+        # Two disjoint chains: 0-1-2 and 3-4-5 placed far apart in x
+        # Plus an isolated node 6
+        # Actually let's keep it simple: chain 0-1-2 and isolated node 3
+        chain_W = np.array([
+            [0, 1, 0, 0],
+            [1, 0, 1, 0],
+            [0, 1, 0, 0],
+            [0, 0, 0, 0],
+        ], dtype=float)
+        W = sparse.csr_matrix(chain_W)
+        adj = AdjacencyMatrix(W=W, areas=["a", "b", "c", "d"])
+        assert adj.n_components() == 2
+
+        # Mock GDF with centroids
+        gdf = MagicMock()
+        # Centroids: 0,1,2 at x=0,1,2; island 3 at x=10
+        gdf.geometry.centroid.x.values = np.array([0.0, 1.0, 2.0, 10.0])
+        gdf.geometry.centroid.y.values = np.array([0.0, 0.0, 0.0, 0.0])
+
+        return adj, gdf
+
+    def test_connect_islands_produces_single_component(self):
+        """After _connect_islands, the result must be fully connected."""
+        from insurance_spatial.adjacency import _connect_islands
+
+        adj, gdf = self._make_disconnected_adj_with_gdf()
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            adj_fixed = _connect_islands(adj, gdf)
+
+        assert adj_fixed.n_components() == 1
+
+    def test_connect_islands_three_components_fully_connected(self):
+        """
+        P1 regression: with three components, the old code would connect B and C
+        both to A (using stale labels).  With per-iteration recomputation,
+        the result must still be a single connected component regardless of
+        which topology is chosen.
+        """
+        from insurance_spatial.adjacency import _connect_islands
+        from unittest.mock import MagicMock
+
+        # Three disjoint single nodes: 0, 1, 2 placed at x = 0, 5, 10
+        W = sparse.csr_matrix(np.zeros((3, 3), dtype=float))
+        adj = AdjacencyMatrix(W=W, areas=["a", "b", "c"])
+        assert adj.n_components() == 3
+
+        gdf = MagicMock()
+        gdf.geometry.centroid.x.values = np.array([0.0, 5.0, 10.0])
+        gdf.geometry.centroid.y.values = np.array([0.0, 0.0, 0.0])
+
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            adj_fixed = _connect_islands(adj, gdf)
+
+        assert adj_fixed.n_components() == 1
