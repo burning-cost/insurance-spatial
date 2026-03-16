@@ -258,7 +258,11 @@ See the demo notebook for a full synthetic example and comments on each data sou
 
 ## Computational notes
 
-For N=11,200 UK postcode sectors, the ICAR model is feasible — the pairwise difference formulation is O(N·K) where K≈6 mean neighbours. Published benchmarks suggest ~20–30 minutes for 4 chains × 1,000 draws on modern hardware. The scaling factor computation (`adj.scaling_factor`) is a one-off sparse linear solve per graph topology; cache it between runs.
+For N=11,200 UK postcode sectors, the ICAR model is feasible — the pairwise difference formulation is O(N·K) where K≈6 mean neighbours. Published benchmarks suggest ~20–30 minutes for 4 chains × 1,000 draws on modern hardware.
+
+**BYM2 scaling factor: O(N^3) warning.** `compute_bym2_scaling_factor()` uses dense eigendecomposition and is O(N^3). This is fine for the toy grids in the quickstart and for regional models up to N≈3,000 areas. For full UK postcode sector models (N≈9,500), precompute the scaling factor once and pass it as a cached value: `AdjacencyMatrix(_scaling_factor=cached_value)`. The scaling factor depends only on the adjacency graph, not the claims data — recompute it only when the geography is updated, not on every model run.
+
+The scaling factor computation (`adj.scaling_factor`) is a one-off per graph topology; cache it between runs.
 
 nutpie is recommended for production: `uv add nutpie`. It uses a Rust NUTS implementation and is typically 2–5x faster than PyMC's default sampler for models of this type.
 

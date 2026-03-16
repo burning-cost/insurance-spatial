@@ -184,7 +184,7 @@ def moran_i(
     # (observed_I much smaller than permutation distribution) is correctly flagged.
     # A one-tailed test using perm_stats >= observed_I would give p ~ 1.0 for
     # strongly negative I, making the result look completely non-significant.
-    p_value = float(np.mean(np.abs(perm_stats - perm_mean) >= abs(observed_I - perm_mean)))
+    p_value = float((np.sum(np.abs(perm_stats - perm_mean) >= abs(observed_I - perm_mean)) + 1) / (n_permutations + 1))
 
     significant = p_value < 0.05
     if significant and observed_I > 0:
