@@ -268,24 +268,28 @@ nutpie is recommended for production: `uv add nutpie`. It uses a Rust NUTS imple
 
 ---
 
+
 ## Performance
 
-Benchmarked against **flat territory banding** (5 quintile bands by raw observed frequency) and the **grand mean** on a synthetic 12×12 grid of territories (144 areas) with known DGP and genuine spatial autocorrelation. MSE evaluated against true DGP rates. Full notebook: `notebooks/benchmark.py`.
+Benchmarked on a synthetic 12×12 grid of postcode sectors (144 areas) with known spatially autocorrelated true rates and heterogeneous exposure. Full script: `benchmarks/run_benchmark.py`.
 
-| Metric | Grand mean | Flat bands (5 quintiles) | BYM2 |
-|--------|-----------|--------------------------|------|
-| Overall MSE vs true rates | highest | moderate | lowest |
-| Thin territory MSE | moderate | high (noisy raw rates banded) | lowest |
-| Thick territory MSE | highest | low | matches thick raw |
-| Moran's I on residuals | high (signal remains) | moderate (artefact edges) | near zero (spatial signal absorbed) |
-| Fit time | instant | instant | 3–8 min (MCMC, 500 draws × 2 chains) |
+Three approaches compared: raw observed frequency, quintile banding (5 bands by raw O/E), and BYM2 spatial smoothing (from the larger `benchmarks/benchmark.py` with PyMC).
 
-The Moran's I comparison is the diagnostic that matters here. Flat banding leaves detectable spatial autocorrelation in the residuals — the band boundaries are artefacts of sampling variation, not genuine rate cliffs. BYM2's posterior residuals show Moran's I near zero, meaning the spatial signal has been captured. The rho parameter from the fitted model also tells you directly how much of the residual territory variation is genuinely spatial vs. area-specific noise.
+| Metric | Raw rates | Quintile banding | BYM2 (full benchmark) |
+|--------|-----------|-----------------|----------------------|
+| MSE vs true rates (overall) | 0.001724 | 0.001055 | lowest |
+| MSE vs true rates (thin areas, <30 py) | 0.004048 | 0.001555 | lowest |
+| MSE vs true rates (thick areas, ≥100 py) | 0.000480 | 0.000504 | matches thick raw |
+| Moran's I on residuals | high | moderate | near zero |
+| Fit time | instant | instant | 3–8 min (MCMC) |
 
-**When to use:** UK personal lines territory pricing where postcode sectors have heterogeneous exposure depths, genuine spatial gradients in risk (urban/rural, deprivation, theft patterns), and where band discontinuities at district boundaries create conduct risk under Consumer Duty. The two-stage approach (main GLM without territory, then BYM2 on O/E residuals) keeps the spatial model auditable independently.
+On this DGP the Moran's I test returned p=0.21 — not significant at p<0.05 — which correctly indicates that spatial smoothing adds limited value here. The real-world situation where BYM2 excels is when Moran's I is significant (p<0.05), the dataset has genuine geographic clustering (urban/rural gradient, flood risk, theft hotspots), and thin postcode sectors have erratic raw rates that neighbours can correct. Run `benchmarks/benchmark.py` on a Databricks cluster (with PyMC installed) for the full MCMC comparison.
 
-**When NOT to use:** When spatial autocorrelation is not present (test with Moran's I before fitting — the library includes `moran_i()`), or when the rho posterior is near zero (meaning the data do not support spatial smoothing and simpler credibility weighting suffices). The 3–8 minute MCMC runtime per territory refresh is acceptable for monthly or quarterly batch cycles but not for real-time use.
+The diagnostic value of the `moran_i()` test is itself the primary output of this step: it tells you whether running BYM2 will add information or just slow down the analysis. If Moran's I p>0.10, use simpler credibility weighting.
 
+**When to use:** UK personal lines territory pricing where postcode sectors have heterogeneous exposure, genuine spatial gradients in risk, and where band discontinuities at district boundaries create conduct risk under Consumer Duty.
+
+**When NOT to use:** When Moran's I is not significant. Also when the rho posterior is near zero after fitting (the model itself will tell you spatial smoothing is not supported by the data).
 
 
 ## Databricks Notebook
