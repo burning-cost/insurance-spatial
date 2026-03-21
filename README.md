@@ -5,6 +5,8 @@
 
 Spatial tools for UK insurance pricing in one install: BYM2 territory ratemaking and spatially weighted conformal prediction intervals.
 
+**Blog post:** [BYM2 Spatial Smoothing for Territory Ratemaking](https://burning-cost.github.io/2026/02/23/spatial-territory-ratemaking-with-bym2/)
+
 ## The Problems
 
 **Territory pricing** in UK personal lines is broken in predictable ways.
@@ -51,6 +53,8 @@ With faster MCMC sampler:
 ```bash
 uv add "insurance-spatial[nutpie]"
 ```
+
+> 💬 Questions or feedback? Start a [Discussion](https://github.com/burning-cost/insurance-spatial/discussions). Found it useful? A ⭐ helps others find it.
 
 ## BYM2 Quick Start
 
