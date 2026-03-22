@@ -7,7 +7,7 @@ name = "insurance-spatial"
 version = "0.2.3"
 description = "BYM2 spatial territory ratemaking and conformal prediction intervals for UK personal lines insurance"
 readme = "README.md"
-license = { file = "LICENSE" }
+license = { text = "MIT" }
 requires-python = ">=3.10"
 authors = [
     { name = "Burning Cost", email = "pricing.frontier@gmail.com" },
