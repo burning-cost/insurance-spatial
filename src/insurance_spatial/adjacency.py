@@ -219,6 +219,13 @@ def build_grid_adjacency(
     def cell(r: int, c: int) -> int:
         return r * ncols + c
 
+    if connectivity not in ("rook", "queen"):
+        raise ValueError(
+            f"connectivity must be 'rook' or 'queen', got {connectivity!r}. "
+            "Use 'rook' for 4-connectivity (shared edges only) or 'queen' for "
+            "8-connectivity (shared edges and vertices)."
+        )
+
     for r in range(nrows):
         for c in range(ncols):
             idx = cell(r, c)

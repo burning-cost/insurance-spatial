@@ -170,6 +170,10 @@ class BYM2Model:
         target_accept: float = 0.9,
         tune: int = 1000,
     ) -> None:
+        if draws < 1:
+            raise ValueError(f"draws must be >= 1, got {draws}")
+        if chains < 1:
+            raise ValueError(f"chains must be >= 1, got {chains}")
         self.adjacency = adjacency
         self.draws = draws
         self.chains = chains
