@@ -28,7 +28,12 @@ __all__ = [
     "__version__",
 ]
 
-__version__ = "0.2.3"
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("insurance-spatial")
+except PackageNotFoundError:
+    __version__ = "0.0.0"  # not installed
 
 
 def __getattr__(name: str):
