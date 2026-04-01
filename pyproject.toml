@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "insurance-spatial"
-version = "0.2.4"
+version = "0.3.0"
 description = "BYM2 spatial territory ratemaking and conformal prediction intervals for UK personal lines insurance"
 readme = "README.md"
 license = "MIT"
@@ -25,6 +25,7 @@ keywords = [
     "ratemaking",
     "conformal-prediction",
     "tweedie",
+    "INLA",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -69,6 +70,13 @@ plots = [
 ]
 nutpie = [
     "nutpie>=0.9",
+]
+inla = [
+    # KAUST pyINLA — no R dependency, bundles compiled C INLA binary.
+    # Wheels available for: Linux x86_64, macOS x86_64 + ARM64, Windows AMD64.
+    # Linux ARM64 (Raspberry Pi) is NOT yet supported (April 2026).
+    "pyinla>=0.1.6",
+    "pandas>=2.0",
 ]
 dev = [
     "pytest>=7.0",
