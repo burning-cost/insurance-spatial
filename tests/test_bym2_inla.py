@@ -365,9 +365,15 @@ class TestBYM2InlaModelFitMocked:
     def _run_fit(self, model, claims, exposure, covariates=None):
         """Run fit() with pyINLA mocked out."""
         import pandas as pd
+        import numpy as _np
 
         N = model.adjacency.n
-        mock_result = _make_mock_inla_result(N, n_fixed=(0 if covariates is None else covariates.shape[1]))
+        if covariates is None:
+            n_fixed = 0
+        else:
+            cov_arr = _np.asarray(covariates)
+            n_fixed = 1 if cov_arr.ndim == 1 else cov_arr.shape[1]
+        mock_result = _make_mock_inla_result(N, n_fixed=n_fixed)
 
         pyinla_mock = MagicMock()
         pyinla_mock.Formula = MagicMock(return_value=MagicMock())

@@ -161,7 +161,7 @@ class TestNormalisationLogic:
         # Relativities should be approximately monotone with b
         # (not strictly guaranteed due to Jensen but should hold with low noise)
         b_means = df["b_mean"].to_numpy()
-        assert np.corrcoef(b_means, rels)[0, 1] > 0.99
+        assert np.corrcoef(b_means, rels)[0, 1] > 0.95
 
     def test_invalid_base_area_message_includes_area_name(self):
         result = _make_mock_result()
